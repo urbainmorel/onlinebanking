@@ -126,7 +126,7 @@ test('le worker Netlify est planifié sans route publique et utilise les runtime
   assert.match(configuration, /NODE_VERSION = "22"/);
   assert.match(configuration, /directory = "netlify\/functions"/);
   assert.match(configuration, /package = "@netlify\/plugin-nextjs"/);
-  assert.match(worker, /schedule: '\* \* \* \* \*'/);
+  assert.match(worker, /schedule: '(?:\*|\*\/5) \* \* \* \*'/);
   assert.match(worker, /Netlify\.env\.get\(key\)/);
   assert.doesNotMatch(worker, /Response\.json\(/);
   assert.doesNotMatch(configuration, /(?:SUPABASE|RESEND|BREVO)_.*=/);

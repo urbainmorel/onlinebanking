@@ -139,19 +139,19 @@ const fr = {
     },
     transfer_submitted: {
       title: 'Virement enregistré',
-      message: 'Votre instruction de virement a été transmise pour vérification.',
+      message: 'Frais de {fee} pour la double validation interne nécessaires.',
     },
     transfer_approved: {
       title: 'Virement approuvé',
-      message: 'Votre virement a été approuvé pour exécution.',
+      message: 'Votre virement est approuvé. Exécution en cours.',
     },
     transfer_completed: {
       title: 'Virement exécuté',
-      message: 'Votre virement a été exécuté avec succès.',
+      message: 'Virement effectué avec succès.',
     },
     transfer_rejected: {
       title: 'Virement refusé',
-      message: 'Votre instruction de virement n’a pas été acceptée.',
+      message: 'Virement refusé. Frais engagés non remboursables.',
     },
     transfer_failed: {
       title: 'Virement non exécuté',
@@ -304,10 +304,10 @@ const en: ExtraMessages = {
     title: 'Notifications', subtitle: 'Track the progress of your transactions.',
     empty: 'You have no notifications.', markAllRead: 'Mark all as read', openItem: 'Open record', markRead: 'Mark as read',
     generic_info: { title: 'Account information', message: 'An update is available in your secure area.' },
-    transfer_submitted: { title: 'Transfer submitted', message: 'Your transfer instruction has been submitted for review.' },
-    transfer_approved: { title: 'Transfer approved', message: 'Your transfer has been approved for execution.' },
-    transfer_completed: { title: 'Transfer completed', message: 'Your transfer has been completed successfully.' },
-    transfer_rejected: { title: 'Transfer declined', message: 'Your transfer instruction was not approved.' },
+    transfer_submitted: { title: 'Transfer recorded', message: 'A fee of {fee} is required for internal dual review.' },
+    transfer_approved: { title: 'Transfer approved', message: 'Your transfer is approved. Execution in progress.' },
+    transfer_completed: { title: 'Transfer executed', message: 'Transfer completed successfully.' },
+    transfer_rejected: { title: 'Transfer rejected', message: 'Transfer rejected. Incurred fees are non-refundable.' },
     transfer_failed: { title: 'Transfer not completed', message: 'Your transfer could not be completed. Please review its status.' },
     loan_submitted: { title: 'Loan application submitted', message: 'Your loan application has been submitted for review.' },
     loan_approved: { title: 'Loan approved', message: 'Your loan application has been approved.' },
@@ -418,10 +418,10 @@ const de: ExtraMessages = {
     title: 'Benachrichtigungen', subtitle: 'Verfolgen Sie den Status Ihrer Vorgänge.',
     empty: 'Sie haben keine Benachrichtigungen.', markAllRead: 'Alle als gelesen markieren', openItem: 'Vorgang öffnen', markRead: 'Als gelesen markieren',
     generic_info: { title: 'Information zu Ihrem Konto', message: 'In Ihrem sicheren Bereich ist eine Aktualisierung verfügbar.' },
-    transfer_submitted: { title: 'Überweisung eingereicht', message: 'Ihr Überweisungsauftrag wurde zur Prüfung eingereicht.' },
-    transfer_approved: { title: 'Überweisung genehmigt', message: 'Ihre Überweisung wurde zur Ausführung genehmigt.' },
-    transfer_completed: { title: 'Überweisung ausgeführt', message: 'Ihre Überweisung wurde erfolgreich ausgeführt.' },
-    transfer_rejected: { title: 'Überweisung abgelehnt', message: 'Ihr Überweisungsauftrag wurde nicht genehmigt.' },
+    transfer_submitted: { title: 'Überweisung erfasst', message: 'Eine Gebühr von {fee} ist für die doppelte interne Prüfung erforderlich.' },
+    transfer_approved: { title: 'Überweisung genehmigt', message: 'Ihre Überweisung ist genehmigt. Ausführung läuft.' },
+    transfer_completed: { title: 'Überweisung ausgeführt', message: 'Überweisung erfolgreich ausgeführt.' },
+    transfer_rejected: { title: 'Überweisung abgelehnt', message: 'Überweisung abgelehnt. Angefallene Gebühren sind nicht erstattungsfähig.' },
     transfer_failed: { title: 'Überweisung nicht ausgeführt', message: 'Ihre Überweisung konnte nicht ausgeführt werden. Bitte prüfen Sie den Status.' },
     loan_submitted: { title: 'Kreditantrag eingereicht', message: 'Ihr Kreditantrag wurde zur Prüfung eingereicht.' },
     loan_approved: { title: 'Kredit genehmigt', message: 'Ihr Kreditantrag wurde genehmigt.' },
@@ -532,10 +532,10 @@ const es: ExtraMessages = {
     title: 'Notificaciones', subtitle: 'Consulte el progreso de sus operaciones.',
     empty: 'No tiene notificaciones.', markAllRead: 'Marcar todo como leído', openItem: 'Abrir expediente', markRead: 'Marcar como leído',
     generic_info: { title: 'Información de su cuenta', message: 'Hay una actualización disponible en su espacio seguro.' },
-    transfer_submitted: { title: 'Transferencia enviada', message: 'Su orden de transferencia se ha enviado para su revisión.' },
-    transfer_approved: { title: 'Transferencia aprobada', message: 'Su transferencia ha sido aprobada para su ejecución.' },
-    transfer_completed: { title: 'Transferencia ejecutada', message: 'Su transferencia se ha ejecutado correctamente.' },
-    transfer_rejected: { title: 'Transferencia rechazada', message: 'Su orden de transferencia no ha sido aprobada.' },
+    transfer_submitted: { title: 'Transferencia registrada', message: 'Se requiere una comisión de {fee} para la doble validación interna.' },
+    transfer_approved: { title: 'Transferencia aprobada', message: 'Su transferencia está aprobada. Ejecución en curso.' },
+    transfer_completed: { title: 'Transferencia ejecutada', message: 'Transferencia realizada con éxito.' },
+    transfer_rejected: { title: 'Transferencia rechazada', message: 'Transferencia rechazada. Los gastos incurridos no son reembolsables.' },
     transfer_failed: { title: 'Transferencia no ejecutada', message: 'No se pudo ejecutar su transferencia. Consulte su estado.' },
     loan_submitted: { title: 'Solicitud de préstamo enviada', message: 'Su solicitud de préstamo se ha enviado para su evaluación.' },
     loan_approved: { title: 'Préstamo aprobado', message: 'Su solicitud de préstamo ha sido aprobada.' },
@@ -646,10 +646,10 @@ const it: ExtraMessages = {
     title: 'Notifiche', subtitle: 'Segua l’avanzamento delle sue operazioni.',
     empty: 'Non ha notifiche.', markAllRead: 'Segna tutte come lette', openItem: 'Apri la pratica', markRead: 'Segna come letta',
     generic_info: { title: 'Informazioni sulla sua area', message: 'È disponibile un aggiornamento nella sua area protetta.' },
-    transfer_submitted: { title: 'Bonifico registrato', message: 'La sua istruzione di bonifico è stata inviata per la verifica.' },
-    transfer_approved: { title: 'Bonifico approvato', message: 'Il suo bonifico è stato approvato per l’esecuzione.' },
-    transfer_completed: { title: 'Bonifico eseguito', message: 'Il suo bonifico è stato eseguito correttamente.' },
-    transfer_rejected: { title: 'Bonifico rifiutato', message: 'La sua istruzione di bonifico non è stata accettata.' },
+    transfer_submitted: { title: 'Bonifico registrato', message: 'È richiesta una commissione di {fee} per la doppia convalida interna.' },
+    transfer_approved: { title: 'Bonifico approvato', message: 'Il Suo bonifico è approvato. Esecuzione in corso.' },
+    transfer_completed: { title: 'Bonifico eseguito', message: 'Bonifico eseguito con successo.' },
+    transfer_rejected: { title: 'Bonifico rifiutato', message: 'Bonifico rifiutato. Le commissioni sostenute non sono rimborsabili.' },
     transfer_failed: { title: 'Bonifico non eseguito', message: 'Non è stato possibile eseguire il bonifico. Consulti il relativo stato.' },
     loan_submitted: { title: 'Richiesta di prestito registrata', message: 'La sua richiesta di prestito è stata inviata per la valutazione.' },
     loan_approved: { title: 'Prestito approvato', message: 'La sua richiesta di prestito è stata approvata.' },
@@ -760,10 +760,10 @@ const nl: ExtraMessages = {
     title: 'Meldingen', subtitle: 'Volg de voortgang van uw transacties.',
     empty: 'U hebt geen meldingen.', markAllRead: 'Alles als gelezen markeren', openItem: 'Dossier openen', markRead: 'Als gelezen markeren',
     generic_info: { title: 'Informatie over uw omgeving', message: 'Er is een update beschikbaar in uw beveiligde omgeving.' },
-    transfer_submitted: { title: 'Overschrijving geregistreerd', message: 'Uw overschrijvingsopdracht is ter controle ingediend.' },
-    transfer_approved: { title: 'Overschrijving goedgekeurd', message: 'Uw overschrijving is goedgekeurd voor uitvoering.' },
-    transfer_completed: { title: 'Overschrijving uitgevoerd', message: 'Uw overschrijving is met succes uitgevoerd.' },
-    transfer_rejected: { title: 'Overschrijving afgewezen', message: 'Uw overschrijvingsopdracht is niet geaccepteerd.' },
+    transfer_submitted: { title: 'Overboeking geregistreerd', message: 'Kosten van {fee} voor de dubbele interne validatie zijn vereist.' },
+    transfer_approved: { title: 'Overboeking goedgekeurd', message: 'Uw overboeking is goedgekeurd. Uitvoering in behandeling.' },
+    transfer_completed: { title: 'Overboeking uitgevoerd', message: 'Overboeking succesvol uitgevoerd.' },
+    transfer_rejected: { title: 'Overboeking geweigerd', message: 'Overboeking geweigerd. Gemaakte kosten zijn niet-restitueerbaar.' },
     transfer_failed: { title: 'Overschrijving niet uitgevoerd', message: 'Uw overschrijving kon niet worden uitgevoerd. Bekijk de status.' },
     loan_submitted: { title: 'Leningaanvraag geregistreerd', message: 'Uw leningaanvraag is ter beoordeling ingediend.' },
     loan_approved: { title: 'Lening goedgekeurd', message: 'Uw leningaanvraag is goedgekeurd.' },
@@ -818,8 +818,14 @@ export function notificationCopy(
   key: NotificationMessageKey,
   params: Record<string, unknown> = {},
 ) {
+  let effectiveParams = params;
+  if (key === 'transfer_submitted' && !params.fee) {
+    const currency = String(params.currency || 'EUR').toUpperCase();
+    const defaultFee = currency === 'USD' ? '150,00 $' : currency === 'GBP' ? '£150.00' : '150,00 €';
+    effectiveParams = { ...params, fee: defaultFee };
+  }
   const message = extraUserMessages[language].notifications[key];
-  return { title: interpolate(message.title, params), message: interpolate(message.message, params) };
+  return { title: interpolate(message.title, effectiveParams), message: interpolate(message.message, effectiveParams) };
 }
 
 export function localizedAppError(language: Language, code: AppErrorCode = 'UNKNOWN_ERROR') {

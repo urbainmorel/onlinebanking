@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAppStore } from '@/lib/store';
 import {
+  ArrowRightLeft,
   BadgePercent,
   Database,
   Hash,
@@ -14,6 +15,26 @@ import { isPublicSupabaseConfigured } from '@/lib/supabase/config';
 import BrandSettingsEditor from '@/components/brand/BrandSettingsEditor';
 import type { ExchangeRateSnapshot } from '@/lib/currency';
 import AdminCredentialsSettings from '@/components/AdminCredentialsSettings';
+
+
+const FEE_CURRENCIES = ['EUR', 'USD', 'CAD', 'CHF', 'GBP'] as const;
+type FeeCurrency = (typeof FEE_CURRENCIES)[number];
+
+interface FeeSettingsDraft {
+  currency: FeeCurrency;
+  dualReviewFee: number;
+  escalationFee: number;
+  complianceFee: number;
+  finalAuthorizationFee: number;
+}
+
+const defaultFeeDraft = (currency: FeeCurrency): FeeSettingsDraft => ({
+  currency,
+  dualReviewFee: 150,
+  escalationFee: 250,
+  complianceFee: 350,
+  finalAuthorizationFee: 500,
+});
 
 const LOAN_CURRENCIES = ['EUR', 'USD', 'CAD', 'CHF', 'GBP'] as const;
 type LoanCurrency = (typeof LOAN_CURRENCIES)[number];
@@ -58,6 +79,8 @@ export default function AdminSettingsView() {
     updateAccountNumberPrefix,
     loanProductSettings,
     updateLoanProductSettings,
+    transferControlFees,
+    updateTransferControlFees,
   } = useAppStore();
   const configured = isPublicSupabaseConfigured();
   const [draftPrefix, setDraftPrefix] = useState<string | null>(null);
@@ -189,6 +212,73 @@ export default function AdminSettingsView() {
       );
     } finally {
       setIsSaving(false);
+    }
+  };
+
+
+  const [selectedFeeCurrency, setSelectedFeeCurrency] =
+    useState<FeeCurrency>('EUR');
+  const [feeDraft, setFeeDraft] = useState<FeeSettingsDraft>(() =>
+    defaultFeeDraft('EUR'),
+  );
+  const [isSavingFee, setIsSavingFee] = useState(false);
+  const [feeFeedback, setFeeFeedback] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
+
+  const selectedFeeSettings = useMemo(
+    () =>
+      transferControlFees.find(
+        (settings) => settings.currency === selectedFeeCurrency,
+      ),
+    [transferControlFees, selectedFeeCurrency],
+  );
+
+  useEffect(() => {
+    const nextDraft = selectedFeeSettings
+      ? {
+          currency: selectedFeeCurrency,
+          dualReviewFee: Number(selectedFeeSettings.dualReviewFee),
+          escalationFee: Number(selectedFeeSettings.escalationFee),
+          complianceFee: Number(selectedFeeSettings.complianceFee),
+          finalAuthorizationFee: Number(selectedFeeSettings.finalAuthorizationFee),
+        }
+      : defaultFeeDraft(selectedFeeCurrency);
+    const timer = window.setTimeout(() => setFeeDraft(nextDraft), 0);
+    return () => window.clearTimeout(timer);
+  }, [selectedFeeCurrency, selectedFeeSettings]);
+
+  const updateFeeDraft = <K extends keyof FeeSettingsDraft>(
+    key: K,
+    value: FeeSettingsDraft[K],
+  ) => {
+    setFeeDraft((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const submitFeeSettings = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setIsSavingFee(true);
+    setFeeFeedback(null);
+    try {
+      await updateTransferControlFees({
+        currency: feeDraft.currency,
+        dualReviewFee: Number(feeDraft.dualReviewFee),
+        escalationFee: Number(feeDraft.escalationFee),
+        complianceFee: Number(feeDraft.complianceFee),
+        finalAuthorizationFee: Number(feeDraft.finalAuthorizationFee),
+      });
+      setFeeFeedback({
+        type: 'success',
+        message: `Frais de contrôle de virement pour ${feeDraft.currency} enregistrés avec succès.`,
+      });
+    } catch (err: unknown) {
+      setFeeFeedback({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Une erreur est survenue.',
+      });
+    } finally {
+      setIsSavingFee(false);
     }
   };
 
@@ -517,6 +607,179 @@ export default function AdminSettingsView() {
               <p className="text-[10px] text-slate-400">
                 Dernière modification :{' '}
                 {new Date(selectedLoanSettings.updatedAt).toLocaleString('fr-FR')}
+              </p>
+            )}
+          </div>
+        </form>
+
+        <form
+          onSubmit={submitFeeSettings}
+          className="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 sm:p-6 md:col-span-2"
+        >
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <ArrowRightLeft className="w-8 h-8 text-blue-600" />
+              <h2 className="font-extrabold text-slate-900 mt-4 text-base">
+                Frais des étapes de contrôle de virement
+              </h2>
+              <p className="text-xs text-slate-500 mt-1 max-w-3xl">
+                Configurez les frais exigés auprès du client pour franchir chaque étape de validation interne de ses virements. Ces montants sont automatiquement injectés dans les e-mails de notification et le suivi client selon la devise du compte émetteur.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-1 rounded-2xl bg-slate-100 p-1">
+              {FEE_CURRENCIES.map((curr) => (
+                <button
+                  key={curr}
+                  type="button"
+                  onClick={() => setSelectedFeeCurrency(curr)}
+                  className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-colors ${
+                    selectedFeeCurrency === curr
+                      ? 'bg-white text-blue-700 shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {curr}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-slate-50/50 p-4">
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600">Étape 1</span>
+                  <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-800">40%</span>
+                </div>
+                <h3 className="mt-2 text-xs font-extrabold text-slate-900">Double validation interne</h3>
+                <p className="mt-1 text-[11px] text-slate-500 leading-relaxed">
+                  Frais requis dès la soumission (Étape 0, 25%) pour déclencher la vérification des coordonnées cibles et de l'authenticité de l'ordre.
+                </p>
+              </div>
+              <label className="mt-4 block">
+                <span className="text-[11px] font-bold text-slate-700">Frais requis ({selectedFeeCurrency})</span>
+                <input
+                  type="number"
+                  min={0}
+                  step="any"
+                  required
+                  value={feeDraft.dualReviewFee}
+                  onChange={(e) => updateFeeDraft('dualReviewFee', Number(e.target.value))}
+                  className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5 font-mono text-sm font-semibold text-slate-900 shadow-sm"
+                  placeholder="150"
+                />
+              </label>
+            </div>
+
+            <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-slate-50/50 p-4">
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600">Étape 2</span>
+                  <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-bold text-indigo-800">60%</span>
+                </div>
+                <h3 className="mt-2 text-xs font-extrabold text-slate-900">Escalade hiérarchique</h3>
+                <p className="mt-1 text-[11px] text-slate-500 leading-relaxed">
+                  Frais requis après la double validation pour la revue managériale par la direction des opérations sur les flux sensibles.
+                </p>
+              </div>
+              <label className="mt-4 block">
+                <span className="text-[11px] font-bold text-slate-700">Frais requis ({selectedFeeCurrency})</span>
+                <input
+                  type="number"
+                  min={0}
+                  step="any"
+                  required
+                  value={feeDraft.escalationFee}
+                  onChange={(e) => updateFeeDraft('escalationFee', Number(e.target.value))}
+                  className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5 font-mono text-sm font-semibold text-slate-900 shadow-sm"
+                  placeholder="250"
+                />
+              </label>
+            </div>
+
+            <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-slate-50/50 p-4">
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600">Étape 3</span>
+                  <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-800">75%</span>
+                </div>
+                <h3 className="mt-2 text-xs font-extrabold text-slate-900">Contrôle conformité</h3>
+                <p className="mt-1 text-[11px] text-slate-500 leading-relaxed">
+                  Frais requis pour le respect strict des réglementations financières internationales et normes anti-blanchiment (AML/KYC).
+                </p>
+              </div>
+              <label className="mt-4 block">
+                <span className="text-[11px] font-bold text-slate-700">Frais requis ({selectedFeeCurrency})</span>
+                <input
+                  type="number"
+                  min={0}
+                  step="any"
+                  required
+                  value={feeDraft.complianceFee}
+                  onChange={(e) => updateFeeDraft('complianceFee', Number(e.target.value))}
+                  className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5 font-mono text-sm font-semibold text-slate-900 shadow-sm"
+                  placeholder="350"
+                />
+              </label>
+            </div>
+
+            <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-slate-50/50 p-4">
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">Étape 4</span>
+                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">90%</span>
+                </div>
+                <h3 className="mt-2 text-xs font-extrabold text-slate-900">Autorisation finale</h3>
+                <p className="mt-1 text-[11px] text-slate-500 leading-relaxed">
+                  Frais requis pour l'arbitrage décisif certifiant la réunion de tous les prérequis légaux et ordonnant le déblocage effectif des fonds.
+                </p>
+              </div>
+              <label className="mt-4 block">
+                <span className="text-[11px] font-bold text-slate-700">Frais requis ({selectedFeeCurrency})</span>
+                <input
+                  type="number"
+                  min={0}
+                  step="any"
+                  required
+                  value={feeDraft.finalAuthorizationFee}
+                  onChange={(e) => updateFeeDraft('finalAuthorizationFee', Number(e.target.value))}
+                  className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5 font-mono text-sm font-semibold text-slate-900 shadow-sm"
+                  placeholder="500"
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-xl bg-blue-50/60 p-3 text-[11px] text-slate-600">
+            <span className="font-bold text-blue-900">Information d’exécution (Étape 5, 100%) & Refus :</span> À l'étape finale d'approbation et d'exécution, aucun frais supplémentaire n'est requis et le justificatif officiel (PDF Confirmation de virement) devient téléchargeable. En cas de rejet par la direction à n'importe quel stade, les frais préalablement engagés demeurent non remboursables.
+          </div>
+
+          {feeFeedback && (
+            <p
+              className={`mt-4 rounded-xl p-3 text-xs font-medium ${
+                feeFeedback.type === 'success'
+                  ? 'bg-emerald-50 text-emerald-800'
+                  : 'bg-rose-50 text-rose-700'
+              }`}
+              role={feeFeedback.type === 'error' ? 'alert' : 'status'}
+            >
+              {feeFeedback.message}
+            </p>
+          )}
+
+          <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <button
+              type="submit"
+              disabled={isSavingFee}
+              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+            >
+              <Save className="h-4 w-4" />
+              {isSavingFee ? 'Enregistrement…' : 'Enregistrer les frais de contrôle'}
+            </button>
+            {selectedFeeSettings?.updatedAt && (
+              <p className="text-[10px] text-slate-400">
+                Dernière modification :{' '}
+                {new Date(selectedFeeSettings.updatedAt).toLocaleString('fr-FR')}
               </p>
             )}
           </div>

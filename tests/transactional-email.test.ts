@@ -160,23 +160,23 @@ const expectedCopy: Record<
 > = {
   transfer_submitted: {
     subject: /demande de virement.*reçue/i,
-    body: /vérifions maintenant les informations fournies/i,
+    body: /double validation interne sont nécessaires/i,
   },
   transfer_check_validated: {
     subject: /contrôle de virement.*validé/i,
-    body: /contrôle « contrôle conformité ».*validé.*contrôle de votre virement continue.*support@monalyz\.com/i,
+    body: /contrôle de conformité.*validé.*autorisation finale sont nécessaires.*support@monalyz\.com/i,
   },
   transfer_approved: {
     subject: /demande de virement.*validée/i,
-    body: /procédons maintenant au virement/i,
+    body: /autorisation finale et a été validé.*service des règlements/i,
   },
   transfer_completed: {
     subject: /virement.*effectué/i,
-    body: /effectué avec succès/i,
+    body: /exécuté avec succès.*Confirmation de virement/i,
   },
   transfer_rejected: {
     subject: /demande de virement.*refusée/i,
-    body: /aucun montant.*débité.*compte Monalyz/i,
+    body: /aucun montant n’a été débité.*frais appliqués aux étapes préalablement engagées/i,
   },
   transfer_failed: {
     subject: /échec.*virement/i,

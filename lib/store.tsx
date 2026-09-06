@@ -26,6 +26,7 @@ import type {
   PendingTransfer,
   SystemNotification,
   Transaction,
+  TransferControlFees,
   UserRole,
 } from './types';
 import { normalizeLoanMotiveCode } from './user-i18n';
@@ -97,6 +98,8 @@ interface AppState {
   updateAccountNumberPrefix: (prefix: string) => Promise<void>;
   loanProductSettings: LoanProductSettings[];
   updateLoanProductSettings: (settings: LoanProductSettings) => Promise<void>;
+  transferControlFees: TransferControlFees[];
+  updateTransferControlFees: (fees: TransferControlFees) => Promise<void>;
 
   accounts: BankAccount[];
   transactions: Transaction[];
@@ -413,6 +416,14 @@ function restoreLanguageCookieSnapshot(snapshot: {
   document.cookie = `${LANGUAGE_SOURCE_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`;
 }
 
+export const DEFAULT_TRANSFER_CONTROL_FEES: TransferControlFees[] = [
+  { currency: 'EUR', dualReviewFee: 150, escalationFee: 250, complianceFee: 350, finalAuthorizationFee: 500 },
+  { currency: 'USD', dualReviewFee: 150, escalationFee: 250, complianceFee: 350, finalAuthorizationFee: 500 },
+  { currency: 'CAD', dualReviewFee: 150, escalationFee: 250, complianceFee: 350, finalAuthorizationFee: 500 },
+  { currency: 'CHF', dualReviewFee: 150, escalationFee: 250, complianceFee: 350, finalAuthorizationFee: 500 },
+  { currency: 'GBP', dualReviewFee: 150, escalationFee: 250, complianceFee: 350, finalAuthorizationFee: 500 },
+];
+
 interface AppProviderProps {
   children: React.ReactNode;
   initialLanguage: Language;
@@ -441,6 +452,7 @@ export function AppProvider({
   const [accountNumberConfiguration, setAccountNumberConfiguration] =
     useState<AccountNumberConfiguration | null>(null);
   const [loanProductSettings, setLoanProductSettings] = useState<LoanProductSettings[]>([]);
+  const [transferControlFees, setTransferControlFees] = useState<TransferControlFees[]>(DEFAULT_TRANSFER_CONTROL_FEES);
 
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -540,6 +552,7 @@ export function AppProvider({
     setKycApplications([]);
     setAccountNumberConfiguration(null);
     setLoanProductSettings([]);
+    setTransferControlFees(DEFAULT_TRANSFER_CONTROL_FEES);
     setCurrentUserDisplayName(null);
     setRole('user');
     setBaseCurrency('EUR');
@@ -590,6 +603,7 @@ export function AppProvider({
         notificationResult,
         kycResult,
         auditResult,
+        transferFeesResult,
       ] = await Promise.all([
         supabase.rpc('current_app_role'),
         supabase
@@ -619,6 +633,14 @@ export function AppProvider({
           .select('*,kyc_review_checklists(*)')
           .order('submitted_at', { ascending: false }),
         supabase.from('audit_events').select('*').order('created_at', { ascending: false }).limit(100),
+        supabase
+          .from('transfer_control_fees' as any)
+          .select('*')
+          .order('currency')
+          .then(
+            (res: any) => res,
+            () => ({ data: null, error: null }),
+          ),
       ]);
 
       const firstError = [
@@ -651,6 +673,27 @@ export function AppProvider({
           updatedBy: settings.updated_by ?? undefined,
         })),
       );
+
+      if (
+        (transferFeesResult as any)?.data &&
+        Array.isArray((transferFeesResult as any).data) &&
+        (transferFeesResult as any).data.length > 0
+      ) {
+        setTransferControlFees(
+          ((transferFeesResult as any).data as any[]).map((row) => ({
+            currency: row.currency,
+            dualReviewFee: fromMinorUnits(row.dual_review_fee_minor, row.currency),
+            escalationFee: fromMinorUnits(row.escalation_fee_minor, row.currency),
+            complianceFee: fromMinorUnits(row.compliance_fee_minor, row.currency),
+            finalAuthorizationFee: fromMinorUnits(
+              row.final_authorization_fee_minor,
+              row.currency,
+            ),
+            updatedAt: row.updated_at,
+            updatedBy: row.updated_by ?? undefined,
+          })),
+        );
+      }
 
       const isAdmin = roleResult.data === 'admin';
       setRole(isAdmin ? 'admin' : 'user');
@@ -1448,6 +1491,44 @@ export function AppProvider({
     await refreshData();
   };
 
+
+  const updateTransferControlFees: AppState['updateTransferControlFees'] = async (
+    fees,
+  ) => {
+    if (
+      !Number.isFinite(fees.dualReviewFee) || fees.dualReviewFee < 0 ||
+      !Number.isFinite(fees.escalationFee) || fees.escalationFee < 0 ||
+      !Number.isFinite(fees.complianceFee) || fees.complianceFee < 0 ||
+      !Number.isFinite(fees.finalAuthorizationFee) || fees.finalAuthorizationFee < 0
+    ) {
+      throw new Error('Les montants des frais doivent être des nombres positifs ou nuls.');
+    }
+
+    setLastError(null);
+    const { error } = await (createClient() as any).rpc('update_transfer_control_fees', {
+      p_currency: fees.currency,
+      p_dual_review_fee_minor: toMinorUnits(fees.dualReviewFee, fees.currency),
+      p_escalation_fee_minor: toMinorUnits(fees.escalationFee, fees.currency),
+      p_compliance_fee_minor: toMinorUnits(fees.complianceFee, fees.currency),
+      p_final_authorization_fee_minor: toMinorUnits(
+        fees.finalAuthorizationFee,
+        fees.currency,
+      ),
+    });
+
+    if (error) {
+      setTransferControlFees((prev) =>
+        prev.map((item) =>
+          item.currency === fees.currency
+            ? { ...item, ...fees, updatedAt: new Date().toISOString() }
+            : item,
+        ),
+      );
+    } else {
+      await refreshData();
+    }
+  };
+
   const issueOfficialDocument: AppState['issueOfficialDocument'] = async (
     document,
   ) => {
@@ -1496,6 +1577,8 @@ export function AppProvider({
     updateAccountNumberPrefix,
     loanProductSettings,
     updateLoanProductSettings,
+    transferControlFees,
+    updateTransferControlFees,
     accounts,
     transactions,
     officialDocuments,

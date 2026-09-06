@@ -331,3 +331,13 @@ export interface CurrencyRates {
   rates: Record<string, number>;
   updatedAt: string;
 }
+
+export interface TransferControlFees {
+  currency: Currency;
+  dualReviewFee: number;
+  escalationFee: number;
+  complianceFee: number;
+  finalAuthorizationFee: number;
+  updatedAt?: string;
+  updatedBy?: string;
+}
