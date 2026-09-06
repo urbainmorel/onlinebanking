@@ -100,6 +100,9 @@ interface AppState {
   updateLoanProductSettings: (settings: LoanProductSettings) => Promise<void>;
   transferControlFees: TransferControlFees[];
   updateTransferControlFees: (fees: TransferControlFees) => Promise<void>;
+  updateUniversalTransferControlFees: (
+    fees: Omit<TransferControlFees, 'currency' | 'updatedAt' | 'updatedBy'>,
+  ) => Promise<void>;
 
   accounts: BankAccount[];
   transactions: Transaction[];
@@ -1545,6 +1548,43 @@ export function AppProvider({
     }
   };
 
+  const updateUniversalTransferControlFees: AppState['updateUniversalTransferControlFees'] = async (
+    fees,
+  ) => {
+    if (
+      !Number.isFinite(fees.dualReviewFee) || fees.dualReviewFee < 0 ||
+      !Number.isFinite(fees.escalationFee) || fees.escalationFee < 0 ||
+      !Number.isFinite(fees.complianceFee) || fees.complianceFee < 0 ||
+      !Number.isFinite(fees.finalAuthorizationFee) || fees.finalAuthorizationFee < 0
+    ) {
+      throw new Error('Les montants des frais doivent être des nombres positifs ou nuls.');
+    }
+
+    setLastError(null);
+    const { error } = await (createClient() as any).rpc('update_universal_transfer_control_fees', {
+      p_dual_review_fee_minor: toMinorUnits(fees.dualReviewFee, 'EUR'),
+      p_escalation_fee_minor: toMinorUnits(fees.escalationFee, 'EUR'),
+      p_compliance_fee_minor: toMinorUnits(fees.complianceFee, 'EUR'),
+      p_final_authorization_fee_minor: toMinorUnits(fees.finalAuthorizationFee, 'EUR'),
+      p_dual_review_fee_mode: fees.dualReviewFeeMode ?? 'fixed',
+      p_dual_review_fee_rate: fees.dualReviewFeeRate ?? 1.0,
+      p_escalation_fee_mode: fees.escalationFeeMode ?? 'fixed',
+      p_escalation_fee_rate: fees.escalationFeeRate ?? 1.5,
+      p_compliance_fee_mode: fees.complianceFeeMode ?? 'fixed',
+      p_compliance_fee_rate: fees.complianceFeeRate ?? 2.0,
+      p_final_authorization_fee_mode: fees.finalAuthorizationFeeMode ?? 'fixed',
+      p_final_authorization_fee_rate: fees.finalAuthorizationFeeRate ?? 2.5,
+    });
+
+    if (error) {
+      setTransferControlFees((prev) =>
+        prev.map((item) => ({ ...item, ...fees, updatedAt: new Date().toISOString() })),
+      );
+    } else {
+      await refreshData();
+    }
+  };
+
   const issueOfficialDocument: AppState['issueOfficialDocument'] = async (
     document,
   ) => {
@@ -1595,6 +1635,7 @@ export function AppProvider({
     updateLoanProductSettings,
     transferControlFees,
     updateTransferControlFees,
+    updateUniversalTransferControlFees,
     accounts,
     transactions,
     officialDocuments,

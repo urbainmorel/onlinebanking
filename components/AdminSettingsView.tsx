@@ -17,11 +17,7 @@ import type { ExchangeRateSnapshot } from '@/lib/currency';
 import AdminCredentialsSettings from '@/components/AdminCredentialsSettings';
 
 
-const FEE_CURRENCIES = ['EUR', 'USD', 'CAD', 'CHF', 'GBP'] as const;
-type FeeCurrency = (typeof FEE_CURRENCIES)[number];
-
 interface FeeSettingsDraft {
-  currency: FeeCurrency;
   dualReviewFee: number;
   dualReviewFeeMode: 'fixed' | 'percentage';
   dualReviewFeeRate: number;
@@ -36,8 +32,7 @@ interface FeeSettingsDraft {
   finalAuthorizationFeeRate: number;
 }
 
-const defaultFeeDraft = (currency: FeeCurrency): FeeSettingsDraft => ({
-  currency,
+const defaultFeeDraft = (): FeeSettingsDraft => ({
   dualReviewFee: 150,
   dualReviewFeeMode: 'fixed',
   dualReviewFeeRate: 1.0,
@@ -97,6 +92,7 @@ export default function AdminSettingsView() {
     updateLoanProductSettings,
     transferControlFees,
     updateTransferControlFees,
+    updateUniversalTransferControlFees,
   } = useAppStore();
   const configured = isPublicSupabaseConfigured();
   const [draftPrefix, setDraftPrefix] = useState<string | null>(null);
@@ -232,10 +228,8 @@ export default function AdminSettingsView() {
   };
 
 
-  const [selectedFeeCurrency, setSelectedFeeCurrency] =
-    useState<FeeCurrency>('EUR');
   const [feeDraft, setFeeDraft] = useState<FeeSettingsDraft>(() =>
-    defaultFeeDraft('EUR'),
+    defaultFeeDraft(),
   );
   const [isSavingFee, setIsSavingFee] = useState(false);
   const [feeFeedback, setFeeFeedback] = useState<{
@@ -243,35 +237,33 @@ export default function AdminSettingsView() {
     message: string;
   } | null>(null);
 
-  const selectedFeeSettings = useMemo(
+  const universalFeeSettings = useMemo(
     () =>
-      transferControlFees.find(
-        (settings) => settings.currency === selectedFeeCurrency,
-      ),
-    [transferControlFees, selectedFeeCurrency],
+      transferControlFees.find((settings) => settings.currency === 'EUR') ??
+      transferControlFees[0],
+    [transferControlFees],
   );
 
   useEffect(() => {
-    const nextDraft: FeeSettingsDraft = selectedFeeSettings
+    const nextDraft: FeeSettingsDraft = universalFeeSettings
       ? {
-          currency: selectedFeeCurrency,
-          dualReviewFee: Number(selectedFeeSettings.dualReviewFee),
-          dualReviewFeeMode: selectedFeeSettings.dualReviewFeeMode ?? 'fixed',
-          dualReviewFeeRate: Number(selectedFeeSettings.dualReviewFeeRate ?? 1.0),
-          escalationFee: Number(selectedFeeSettings.escalationFee),
-          escalationFeeMode: selectedFeeSettings.escalationFeeMode ?? 'fixed',
-          escalationFeeRate: Number(selectedFeeSettings.escalationFeeRate ?? 1.5),
-          complianceFee: Number(selectedFeeSettings.complianceFee),
-          complianceFeeMode: selectedFeeSettings.complianceFeeMode ?? 'fixed',
-          complianceFeeRate: Number(selectedFeeSettings.complianceFeeRate ?? 2.0),
-          finalAuthorizationFee: Number(selectedFeeSettings.finalAuthorizationFee),
-          finalAuthorizationFeeMode: selectedFeeSettings.finalAuthorizationFeeMode ?? 'fixed',
-          finalAuthorizationFeeRate: Number(selectedFeeSettings.finalAuthorizationFeeRate ?? 2.5),
+          dualReviewFee: Number(universalFeeSettings.dualReviewFee),
+          dualReviewFeeMode: universalFeeSettings.dualReviewFeeMode ?? 'fixed',
+          dualReviewFeeRate: Number(universalFeeSettings.dualReviewFeeRate ?? 1.0),
+          escalationFee: Number(universalFeeSettings.escalationFee),
+          escalationFeeMode: universalFeeSettings.escalationFeeMode ?? 'fixed',
+          escalationFeeRate: Number(universalFeeSettings.escalationFeeRate ?? 1.5),
+          complianceFee: Number(universalFeeSettings.complianceFee),
+          complianceFeeMode: universalFeeSettings.complianceFeeMode ?? 'fixed',
+          complianceFeeRate: Number(universalFeeSettings.complianceFeeRate ?? 2.0),
+          finalAuthorizationFee: Number(universalFeeSettings.finalAuthorizationFee),
+          finalAuthorizationFeeMode: universalFeeSettings.finalAuthorizationFeeMode ?? 'fixed',
+          finalAuthorizationFeeRate: Number(universalFeeSettings.finalAuthorizationFeeRate ?? 2.5),
         }
-      : defaultFeeDraft(selectedFeeCurrency);
+      : defaultFeeDraft();
     const timer = window.setTimeout(() => setFeeDraft(nextDraft), 0);
     return () => window.clearTimeout(timer);
-  }, [selectedFeeCurrency, selectedFeeSettings]);
+  }, [universalFeeSettings]);
 
   const updateFeeDraft = <K extends keyof FeeSettingsDraft>(
     key: K,
@@ -285,8 +277,7 @@ export default function AdminSettingsView() {
     setIsSavingFee(true);
     setFeeFeedback(null);
     try {
-      await updateTransferControlFees({
-        currency: feeDraft.currency,
+      await updateUniversalTransferControlFees({
         dualReviewFee: Number(feeDraft.dualReviewFee),
         dualReviewFeeMode: feeDraft.dualReviewFeeMode,
         dualReviewFeeRate: Number(feeDraft.dualReviewFeeRate),
@@ -302,12 +293,15 @@ export default function AdminSettingsView() {
       });
       setFeeFeedback({
         type: 'success',
-        message: `Frais de contrôle de virement pour ${feeDraft.currency} enregistrés avec succès.`,
+        message: 'Paramètres des frais enregistrés avec succès. Ils sont automatiquement appliqués dans la devise de chaque virement.',
       });
     } catch (err: unknown) {
       setFeeFeedback({
         type: 'error',
-        message: err instanceof Error ? err.message : 'Une erreur est survenue.',
+        message:
+          err instanceof Error
+            ? err.message
+            : 'Enregistrement des frais impossible.',
       });
     } finally {
       setIsSavingFee(false);
@@ -655,24 +649,12 @@ export default function AdminSettingsView() {
                 Frais des étapes de contrôle de virement
               </h2>
               <p className="text-xs text-slate-500 mt-1 max-w-3xl">
-                Configurez les frais exigés auprès du client pour franchir chaque étape de validation interne de ses virements. Ces montants sont automatiquement injectés dans les e-mails de notification et le suivi client selon la devise du compte émetteur.
+                Configurez les frais exigés auprès du client pour franchir chaque étape de contrôle. Vous pouvez choisir pour chaque étape un montant fixe ou un pourcentage (%) du montant viré. Les frais sont <strong>automatiquement calculés et appliqués dans la devise exacte du virement du client</strong> (EUR, USD, CAD, CHF, GBP).
               </p>
             </div>
-            <div className="flex flex-wrap gap-1 rounded-2xl bg-slate-100 p-1">
-              {FEE_CURRENCIES.map((curr) => (
-                <button
-                  key={curr}
-                  type="button"
-                  onClick={() => setSelectedFeeCurrency(curr)}
-                  className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-colors ${
-                    selectedFeeCurrency === curr
-                      ? 'bg-white text-blue-700 shadow-sm'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  {curr}
-                </button>
-              ))}
+            <div className="inline-flex items-center gap-2 rounded-2xl bg-blue-50 px-3.5 py-2 text-xs font-bold text-blue-800 border border-blue-100">
+              <ShieldCheck className="h-4 w-4 text-blue-600" />
+              <span>Devise automatique du virement</span>
             </div>
           </div>
 
@@ -719,7 +701,7 @@ export default function AdminSettingsView() {
               <div className="mt-4">
                 {feeDraft.dualReviewFeeMode === 'fixed' ? (
                   <label className="block">
-                    <span className="text-[11px] font-bold text-slate-700">Montant fixe ({selectedFeeCurrency})</span>
+                    <span className="text-[11px] font-bold text-slate-700">Montant fixe (devise du virement)</span>
                     <input
                       type="number"
                       min={0}
@@ -751,7 +733,7 @@ export default function AdminSettingsView() {
                       </div>
                     </label>
                     <p className="mt-1.5 text-[10px] text-blue-700 font-medium bg-blue-50/80 rounded-lg p-1.5">
-                      💡 Ex: {((10000 * feeDraft.dualReviewFeeRate) / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {selectedFeeCurrency} pour 10 000 {selectedFeeCurrency}
+                      💡 Ex: {((10000 * feeDraft.dualReviewFeeRate) / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} devise pour 10 000 devise
                     </p>
                   </div>
                 )}
@@ -800,7 +782,7 @@ export default function AdminSettingsView() {
               <div className="mt-4">
                 {feeDraft.escalationFeeMode === 'fixed' ? (
                   <label className="block">
-                    <span className="text-[11px] font-bold text-slate-700">Montant fixe ({selectedFeeCurrency})</span>
+                    <span className="text-[11px] font-bold text-slate-700">Montant fixe (devise du virement)</span>
                     <input
                       type="number"
                       min={0}
@@ -832,7 +814,7 @@ export default function AdminSettingsView() {
                       </div>
                     </label>
                     <p className="mt-1.5 text-[10px] text-indigo-700 font-medium bg-indigo-50/80 rounded-lg p-1.5">
-                      💡 Ex: {((10000 * feeDraft.escalationFeeRate) / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {selectedFeeCurrency} pour 10 000 {selectedFeeCurrency}
+                      💡 Ex: {((10000 * feeDraft.escalationFeeRate) / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} devise pour 10 000 devise
                     </p>
                   </div>
                 )}
@@ -881,7 +863,7 @@ export default function AdminSettingsView() {
               <div className="mt-4">
                 {feeDraft.complianceFeeMode === 'fixed' ? (
                   <label className="block">
-                    <span className="text-[11px] font-bold text-slate-700">Montant fixe ({selectedFeeCurrency})</span>
+                    <span className="text-[11px] font-bold text-slate-700">Montant fixe (devise du virement)</span>
                     <input
                       type="number"
                       min={0}
@@ -913,7 +895,7 @@ export default function AdminSettingsView() {
                       </div>
                     </label>
                     <p className="mt-1.5 text-[10px] text-purple-700 font-medium bg-purple-50/80 rounded-lg p-1.5">
-                      💡 Ex: {((10000 * feeDraft.complianceFeeRate) / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {selectedFeeCurrency} pour 10 000 {selectedFeeCurrency}
+                      💡 Ex: {((10000 * feeDraft.complianceFeeRate) / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} devise pour 10 000 devise
                     </p>
                   </div>
                 )}
@@ -962,7 +944,7 @@ export default function AdminSettingsView() {
               <div className="mt-4">
                 {feeDraft.finalAuthorizationFeeMode === 'fixed' ? (
                   <label className="block">
-                    <span className="text-[11px] font-bold text-slate-700">Montant fixe ({selectedFeeCurrency})</span>
+                    <span className="text-[11px] font-bold text-slate-700">Montant fixe (devise du virement)</span>
                     <input
                       type="number"
                       min={0}
@@ -994,7 +976,7 @@ export default function AdminSettingsView() {
                       </div>
                     </label>
                     <p className="mt-1.5 text-[10px] text-emerald-700 font-medium bg-emerald-50/80 rounded-lg p-1.5">
-                      💡 Ex: {((10000 * feeDraft.finalAuthorizationFeeRate) / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {selectedFeeCurrency} pour 10 000 {selectedFeeCurrency}
+                      💡 Ex: {((10000 * feeDraft.finalAuthorizationFeeRate) / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} devise pour 10 000 devise
                     </p>
                   </div>
                 )}
@@ -1028,10 +1010,10 @@ export default function AdminSettingsView() {
               <Save className="h-4 w-4" />
               {isSavingFee ? 'Enregistrement…' : 'Enregistrer les frais de contrôle'}
             </button>
-            {selectedFeeSettings?.updatedAt && (
+            {universalFeeSettings?.updatedAt && (
               <p className="text-[10px] text-slate-400">
                 Dernière modification :{' '}
-                {new Date(selectedFeeSettings.updatedAt).toLocaleString('fr-FR')}
+                {new Date(universalFeeSettings.updatedAt).toLocaleString('fr-FR')}
               </p>
             )}
           </div>
