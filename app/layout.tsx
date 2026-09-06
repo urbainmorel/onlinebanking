@@ -92,7 +92,9 @@ export default async function RootLayout({children}: {children: React.ReactNode}
   const cookieStore = await cookies();
   let profileLanguage: string | null = null;
 
-  if (isPublicSupabaseConfigured()) {
+  const hasAuthToken = cookieStore.getAll().some((c) => c.name.startsWith('sb-'));
+
+  if (hasAuthToken && isPublicSupabaseConfigured()) {
     try {
       const supabase = await createClient();
       const {

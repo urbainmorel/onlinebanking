@@ -78,5 +78,5 @@ export default async function transactionalEmailWorker(_request: Request) {
 }
 
 export const config: Config = {
-  schedule: '* * * * *',
+  schedule: '*/5 * * * *',
 };

@@ -4,6 +4,7 @@ import { cache } from 'react';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { createClient as createSupabaseJsClient } from '@supabase/supabase-js';
 import {
   DEFAULT_BRAND_ROW,
   DEFAULT_BRAND_SETTINGS,
@@ -11,7 +12,6 @@ import {
   type BrandSettingsRow,
 } from '@/lib/branding';
 import { isPublicSupabaseConfigured, getPublicSupabaseConfig } from '@/lib/supabase/config';
-import { createClient } from '@/lib/supabase/server';
 import type { BrandSettings } from '@/lib/types';
 
 export async function fetchBrandRow(
@@ -31,9 +31,10 @@ export async function resolveBrandSettings(
 ): Promise<BrandSettings> {
   if (!isPublicSupabaseConfigured()) return DEFAULT_BRAND_SETTINGS;
   try {
-    const effectiveClient = client ?? (await createClient());
+    const { url, publishableKey } = getPublicSupabaseConfig();
+    const effectiveClient = client ?? createSupabaseJsClient(url, publishableKey);
     const row = await fetchBrandRow(effectiveClient);
-    return mapBrandSettings(row, getPublicSupabaseConfig().url);
+    return mapBrandSettings(row, url);
   } catch {
     return DEFAULT_BRAND_SETTINGS;
   }
