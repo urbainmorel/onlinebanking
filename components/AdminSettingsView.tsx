@@ -23,17 +23,33 @@ type FeeCurrency = (typeof FEE_CURRENCIES)[number];
 interface FeeSettingsDraft {
   currency: FeeCurrency;
   dualReviewFee: number;
+  dualReviewFeeMode: 'fixed' | 'percentage';
+  dualReviewFeeRate: number;
   escalationFee: number;
+  escalationFeeMode: 'fixed' | 'percentage';
+  escalationFeeRate: number;
   complianceFee: number;
+  complianceFeeMode: 'fixed' | 'percentage';
+  complianceFeeRate: number;
   finalAuthorizationFee: number;
+  finalAuthorizationFeeMode: 'fixed' | 'percentage';
+  finalAuthorizationFeeRate: number;
 }
 
 const defaultFeeDraft = (currency: FeeCurrency): FeeSettingsDraft => ({
   currency,
   dualReviewFee: 150,
+  dualReviewFeeMode: 'fixed',
+  dualReviewFeeRate: 1.0,
   escalationFee: 250,
+  escalationFeeMode: 'fixed',
+  escalationFeeRate: 1.5,
   complianceFee: 350,
+  complianceFeeMode: 'fixed',
+  complianceFeeRate: 2.0,
   finalAuthorizationFee: 500,
+  finalAuthorizationFeeMode: 'fixed',
+  finalAuthorizationFeeRate: 2.5,
 });
 
 const LOAN_CURRENCIES = ['EUR', 'USD', 'CAD', 'CHF', 'GBP'] as const;
@@ -236,13 +252,21 @@ export default function AdminSettingsView() {
   );
 
   useEffect(() => {
-    const nextDraft = selectedFeeSettings
+    const nextDraft: FeeSettingsDraft = selectedFeeSettings
       ? {
           currency: selectedFeeCurrency,
           dualReviewFee: Number(selectedFeeSettings.dualReviewFee),
+          dualReviewFeeMode: selectedFeeSettings.dualReviewFeeMode ?? 'fixed',
+          dualReviewFeeRate: Number(selectedFeeSettings.dualReviewFeeRate ?? 1.0),
           escalationFee: Number(selectedFeeSettings.escalationFee),
+          escalationFeeMode: selectedFeeSettings.escalationFeeMode ?? 'fixed',
+          escalationFeeRate: Number(selectedFeeSettings.escalationFeeRate ?? 1.5),
           complianceFee: Number(selectedFeeSettings.complianceFee),
+          complianceFeeMode: selectedFeeSettings.complianceFeeMode ?? 'fixed',
+          complianceFeeRate: Number(selectedFeeSettings.complianceFeeRate ?? 2.0),
           finalAuthorizationFee: Number(selectedFeeSettings.finalAuthorizationFee),
+          finalAuthorizationFeeMode: selectedFeeSettings.finalAuthorizationFeeMode ?? 'fixed',
+          finalAuthorizationFeeRate: Number(selectedFeeSettings.finalAuthorizationFeeRate ?? 2.5),
         }
       : defaultFeeDraft(selectedFeeCurrency);
     const timer = window.setTimeout(() => setFeeDraft(nextDraft), 0);
@@ -264,9 +288,17 @@ export default function AdminSettingsView() {
       await updateTransferControlFees({
         currency: feeDraft.currency,
         dualReviewFee: Number(feeDraft.dualReviewFee),
+        dualReviewFeeMode: feeDraft.dualReviewFeeMode,
+        dualReviewFeeRate: Number(feeDraft.dualReviewFeeRate),
         escalationFee: Number(feeDraft.escalationFee),
+        escalationFeeMode: feeDraft.escalationFeeMode,
+        escalationFeeRate: Number(feeDraft.escalationFeeRate),
         complianceFee: Number(feeDraft.complianceFee),
+        complianceFeeMode: feeDraft.complianceFeeMode,
+        complianceFeeRate: Number(feeDraft.complianceFeeRate),
         finalAuthorizationFee: Number(feeDraft.finalAuthorizationFee),
+        finalAuthorizationFeeMode: feeDraft.finalAuthorizationFeeMode,
+        finalAuthorizationFeeRate: Number(feeDraft.finalAuthorizationFeeRate),
       });
       setFeeFeedback({
         type: 'success',
@@ -645,6 +677,7 @@ export default function AdminSettingsView() {
           </div>
 
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {/* Étape 1 : Double validation interne */}
             <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-slate-50/50 p-4">
               <div>
                 <div className="flex items-center justify-between">
@@ -655,22 +688,77 @@ export default function AdminSettingsView() {
                 <p className="mt-1 text-[11px] text-slate-500 leading-relaxed">
                   Frais requis dès la soumission (Étape 0, 25%) pour déclencher la vérification des coordonnées cibles et de l'authenticité de l'ordre.
                 </p>
+
+                {/* Mode Selector */}
+                <div className="mt-3 flex rounded-xl bg-slate-200/80 p-0.5 text-[11px] font-bold">
+                  <button
+                    type="button"
+                    onClick={() => updateFeeDraft('dualReviewFeeMode', 'fixed')}
+                    className={`flex-1 rounded-lg py-1 transition-colors ${
+                      feeDraft.dualReviewFeeMode === 'fixed'
+                        ? 'bg-white text-blue-700 shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Montant fixe
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateFeeDraft('dualReviewFeeMode', 'percentage')}
+                    className={`flex-1 rounded-lg py-1 transition-colors ${
+                      feeDraft.dualReviewFeeMode === 'percentage'
+                        ? 'bg-white text-blue-700 shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Pourcentage (%)
+                  </button>
+                </div>
               </div>
-              <label className="mt-4 block">
-                <span className="text-[11px] font-bold text-slate-700">Frais requis ({selectedFeeCurrency})</span>
-                <input
-                  type="number"
-                  min={0}
-                  step="any"
-                  required
-                  value={feeDraft.dualReviewFee}
-                  onChange={(e) => updateFeeDraft('dualReviewFee', Number(e.target.value))}
-                  className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5 font-mono text-sm font-semibold text-slate-900 shadow-sm"
-                  placeholder="150"
-                />
-              </label>
+
+              <div className="mt-4">
+                {feeDraft.dualReviewFeeMode === 'fixed' ? (
+                  <label className="block">
+                    <span className="text-[11px] font-bold text-slate-700">Montant fixe ({selectedFeeCurrency})</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step="any"
+                      required
+                      value={feeDraft.dualReviewFee}
+                      onChange={(e) => updateFeeDraft('dualReviewFee', Number(e.target.value))}
+                      className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5 font-mono text-sm font-semibold text-slate-900 shadow-sm"
+                      placeholder="150"
+                    />
+                  </label>
+                ) : (
+                  <div>
+                    <label className="block">
+                      <span className="text-[11px] font-bold text-slate-700">Taux en % du virement</span>
+                      <div className="relative mt-1">
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step="0.01"
+                          required
+                          value={feeDraft.dualReviewFeeRate}
+                          onChange={(e) => updateFeeDraft('dualReviewFeeRate', Number(e.target.value))}
+                          className="w-full rounded-xl border border-slate-300 bg-white p-2.5 pr-8 font-mono text-sm font-semibold text-slate-900 shadow-sm"
+                          placeholder="1.00"
+                        />
+                        <span className="absolute right-3 top-2.5 font-mono text-sm font-bold text-slate-400">%</span>
+                      </div>
+                    </label>
+                    <p className="mt-1.5 text-[10px] text-blue-700 font-medium bg-blue-50/80 rounded-lg p-1.5">
+                      💡 Ex: {((10000 * feeDraft.dualReviewFeeRate) / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {selectedFeeCurrency} pour 10 000 {selectedFeeCurrency}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
 
+            {/* Étape 2 : Escalade hiérarchique */}
             <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-slate-50/50 p-4">
               <div>
                 <div className="flex items-center justify-between">
@@ -681,22 +769,77 @@ export default function AdminSettingsView() {
                 <p className="mt-1 text-[11px] text-slate-500 leading-relaxed">
                   Frais requis après la double validation pour la revue managériale par la direction des opérations sur les flux sensibles.
                 </p>
+
+                {/* Mode Selector */}
+                <div className="mt-3 flex rounded-xl bg-slate-200/80 p-0.5 text-[11px] font-bold">
+                  <button
+                    type="button"
+                    onClick={() => updateFeeDraft('escalationFeeMode', 'fixed')}
+                    className={`flex-1 rounded-lg py-1 transition-colors ${
+                      feeDraft.escalationFeeMode === 'fixed'
+                        ? 'bg-white text-indigo-700 shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Montant fixe
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateFeeDraft('escalationFeeMode', 'percentage')}
+                    className={`flex-1 rounded-lg py-1 transition-colors ${
+                      feeDraft.escalationFeeMode === 'percentage'
+                        ? 'bg-white text-indigo-700 shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Pourcentage (%)
+                  </button>
+                </div>
               </div>
-              <label className="mt-4 block">
-                <span className="text-[11px] font-bold text-slate-700">Frais requis ({selectedFeeCurrency})</span>
-                <input
-                  type="number"
-                  min={0}
-                  step="any"
-                  required
-                  value={feeDraft.escalationFee}
-                  onChange={(e) => updateFeeDraft('escalationFee', Number(e.target.value))}
-                  className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5 font-mono text-sm font-semibold text-slate-900 shadow-sm"
-                  placeholder="250"
-                />
-              </label>
+
+              <div className="mt-4">
+                {feeDraft.escalationFeeMode === 'fixed' ? (
+                  <label className="block">
+                    <span className="text-[11px] font-bold text-slate-700">Montant fixe ({selectedFeeCurrency})</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step="any"
+                      required
+                      value={feeDraft.escalationFee}
+                      onChange={(e) => updateFeeDraft('escalationFee', Number(e.target.value))}
+                      className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5 font-mono text-sm font-semibold text-slate-900 shadow-sm"
+                      placeholder="250"
+                    />
+                  </label>
+                ) : (
+                  <div>
+                    <label className="block">
+                      <span className="text-[11px] font-bold text-slate-700">Taux en % du virement</span>
+                      <div className="relative mt-1">
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step="0.01"
+                          required
+                          value={feeDraft.escalationFeeRate}
+                          onChange={(e) => updateFeeDraft('escalationFeeRate', Number(e.target.value))}
+                          className="w-full rounded-xl border border-slate-300 bg-white p-2.5 pr-8 font-mono text-sm font-semibold text-slate-900 shadow-sm"
+                          placeholder="1.50"
+                        />
+                        <span className="absolute right-3 top-2.5 font-mono text-sm font-bold text-slate-400">%</span>
+                      </div>
+                    </label>
+                    <p className="mt-1.5 text-[10px] text-indigo-700 font-medium bg-indigo-50/80 rounded-lg p-1.5">
+                      💡 Ex: {((10000 * feeDraft.escalationFeeRate) / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {selectedFeeCurrency} pour 10 000 {selectedFeeCurrency}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
 
+            {/* Étape 3 : Contrôle conformité */}
             <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-slate-50/50 p-4">
               <div>
                 <div className="flex items-center justify-between">
@@ -707,22 +850,77 @@ export default function AdminSettingsView() {
                 <p className="mt-1 text-[11px] text-slate-500 leading-relaxed">
                   Frais requis pour le respect strict des réglementations financières internationales et normes anti-blanchiment (AML/KYC).
                 </p>
+
+                {/* Mode Selector */}
+                <div className="mt-3 flex rounded-xl bg-slate-200/80 p-0.5 text-[11px] font-bold">
+                  <button
+                    type="button"
+                    onClick={() => updateFeeDraft('complianceFeeMode', 'fixed')}
+                    className={`flex-1 rounded-lg py-1 transition-colors ${
+                      feeDraft.complianceFeeMode === 'fixed'
+                        ? 'bg-white text-purple-700 shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Montant fixe
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateFeeDraft('complianceFeeMode', 'percentage')}
+                    className={`flex-1 rounded-lg py-1 transition-colors ${
+                      feeDraft.complianceFeeMode === 'percentage'
+                        ? 'bg-white text-purple-700 shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Pourcentage (%)
+                  </button>
+                </div>
               </div>
-              <label className="mt-4 block">
-                <span className="text-[11px] font-bold text-slate-700">Frais requis ({selectedFeeCurrency})</span>
-                <input
-                  type="number"
-                  min={0}
-                  step="any"
-                  required
-                  value={feeDraft.complianceFee}
-                  onChange={(e) => updateFeeDraft('complianceFee', Number(e.target.value))}
-                  className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5 font-mono text-sm font-semibold text-slate-900 shadow-sm"
-                  placeholder="350"
-                />
-              </label>
+
+              <div className="mt-4">
+                {feeDraft.complianceFeeMode === 'fixed' ? (
+                  <label className="block">
+                    <span className="text-[11px] font-bold text-slate-700">Montant fixe ({selectedFeeCurrency})</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step="any"
+                      required
+                      value={feeDraft.complianceFee}
+                      onChange={(e) => updateFeeDraft('complianceFee', Number(e.target.value))}
+                      className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5 font-mono text-sm font-semibold text-slate-900 shadow-sm"
+                      placeholder="350"
+                    />
+                  </label>
+                ) : (
+                  <div>
+                    <label className="block">
+                      <span className="text-[11px] font-bold text-slate-700">Taux en % du virement</span>
+                      <div className="relative mt-1">
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step="0.01"
+                          required
+                          value={feeDraft.complianceFeeRate}
+                          onChange={(e) => updateFeeDraft('complianceFeeRate', Number(e.target.value))}
+                          className="w-full rounded-xl border border-slate-300 bg-white p-2.5 pr-8 font-mono text-sm font-semibold text-slate-900 shadow-sm"
+                          placeholder="2.00"
+                        />
+                        <span className="absolute right-3 top-2.5 font-mono text-sm font-bold text-slate-400">%</span>
+                      </div>
+                    </label>
+                    <p className="mt-1.5 text-[10px] text-purple-700 font-medium bg-purple-50/80 rounded-lg p-1.5">
+                      💡 Ex: {((10000 * feeDraft.complianceFeeRate) / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {selectedFeeCurrency} pour 10 000 {selectedFeeCurrency}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
 
+            {/* Étape 4 : Autorisation finale */}
             <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-slate-50/50 p-4">
               <div>
                 <div className="flex items-center justify-between">
@@ -733,20 +931,74 @@ export default function AdminSettingsView() {
                 <p className="mt-1 text-[11px] text-slate-500 leading-relaxed">
                   Frais requis pour l'arbitrage décisif certifiant la réunion de tous les prérequis légaux et ordonnant le déblocage effectif des fonds.
                 </p>
+
+                {/* Mode Selector */}
+                <div className="mt-3 flex rounded-xl bg-slate-200/80 p-0.5 text-[11px] font-bold">
+                  <button
+                    type="button"
+                    onClick={() => updateFeeDraft('finalAuthorizationFeeMode', 'fixed')}
+                    className={`flex-1 rounded-lg py-1 transition-colors ${
+                      feeDraft.finalAuthorizationFeeMode === 'fixed'
+                        ? 'bg-white text-emerald-700 shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Montant fixe
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateFeeDraft('finalAuthorizationFeeMode', 'percentage')}
+                    className={`flex-1 rounded-lg py-1 transition-colors ${
+                      feeDraft.finalAuthorizationFeeMode === 'percentage'
+                        ? 'bg-white text-emerald-700 shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Pourcentage (%)
+                  </button>
+                </div>
               </div>
-              <label className="mt-4 block">
-                <span className="text-[11px] font-bold text-slate-700">Frais requis ({selectedFeeCurrency})</span>
-                <input
-                  type="number"
-                  min={0}
-                  step="any"
-                  required
-                  value={feeDraft.finalAuthorizationFee}
-                  onChange={(e) => updateFeeDraft('finalAuthorizationFee', Number(e.target.value))}
-                  className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5 font-mono text-sm font-semibold text-slate-900 shadow-sm"
-                  placeholder="500"
-                />
-              </label>
+
+              <div className="mt-4">
+                {feeDraft.finalAuthorizationFeeMode === 'fixed' ? (
+                  <label className="block">
+                    <span className="text-[11px] font-bold text-slate-700">Montant fixe ({selectedFeeCurrency})</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step="any"
+                      required
+                      value={feeDraft.finalAuthorizationFee}
+                      onChange={(e) => updateFeeDraft('finalAuthorizationFee', Number(e.target.value))}
+                      className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5 font-mono text-sm font-semibold text-slate-900 shadow-sm"
+                      placeholder="500"
+                    />
+                  </label>
+                ) : (
+                  <div>
+                    <label className="block">
+                      <span className="text-[11px] font-bold text-slate-700">Taux en % du virement</span>
+                      <div className="relative mt-1">
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step="0.01"
+                          required
+                          value={feeDraft.finalAuthorizationFeeRate}
+                          onChange={(e) => updateFeeDraft('finalAuthorizationFeeRate', Number(e.target.value))}
+                          className="w-full rounded-xl border border-slate-300 bg-white p-2.5 pr-8 font-mono text-sm font-semibold text-slate-900 shadow-sm"
+                          placeholder="2.50"
+                        />
+                        <span className="absolute right-3 top-2.5 font-mono text-sm font-bold text-slate-400">%</span>
+                      </div>
+                    </label>
+                    <p className="mt-1.5 text-[10px] text-emerald-700 font-medium bg-emerald-50/80 rounded-lg p-1.5">
+                      💡 Ex: {((10000 * feeDraft.finalAuthorizationFeeRate) / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {selectedFeeCurrency} pour 10 000 {selectedFeeCurrency}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

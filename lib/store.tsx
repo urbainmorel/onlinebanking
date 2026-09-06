@@ -417,11 +417,11 @@ function restoreLanguageCookieSnapshot(snapshot: {
 }
 
 export const DEFAULT_TRANSFER_CONTROL_FEES: TransferControlFees[] = [
-  { currency: 'EUR', dualReviewFee: 150, escalationFee: 250, complianceFee: 350, finalAuthorizationFee: 500 },
-  { currency: 'USD', dualReviewFee: 150, escalationFee: 250, complianceFee: 350, finalAuthorizationFee: 500 },
-  { currency: 'CAD', dualReviewFee: 150, escalationFee: 250, complianceFee: 350, finalAuthorizationFee: 500 },
-  { currency: 'CHF', dualReviewFee: 150, escalationFee: 250, complianceFee: 350, finalAuthorizationFee: 500 },
-  { currency: 'GBP', dualReviewFee: 150, escalationFee: 250, complianceFee: 350, finalAuthorizationFee: 500 },
+  { currency: 'EUR', dualReviewFee: 150, dualReviewFeeMode: 'fixed', dualReviewFeeRate: 1.0, escalationFee: 250, escalationFeeMode: 'fixed', escalationFeeRate: 1.5, complianceFee: 350, complianceFeeMode: 'fixed', complianceFeeRate: 2.0, finalAuthorizationFee: 500, finalAuthorizationFeeMode: 'fixed', finalAuthorizationFeeRate: 2.5 },
+  { currency: 'USD', dualReviewFee: 150, dualReviewFeeMode: 'fixed', dualReviewFeeRate: 1.0, escalationFee: 250, escalationFeeMode: 'fixed', escalationFeeRate: 1.5, complianceFee: 350, complianceFeeMode: 'fixed', complianceFeeRate: 2.0, finalAuthorizationFee: 500, finalAuthorizationFeeMode: 'fixed', finalAuthorizationFeeRate: 2.5 },
+  { currency: 'CAD', dualReviewFee: 150, dualReviewFeeMode: 'fixed', dualReviewFeeRate: 1.0, escalationFee: 250, escalationFeeMode: 'fixed', escalationFeeRate: 1.5, complianceFee: 350, complianceFeeMode: 'fixed', complianceFeeRate: 2.0, finalAuthorizationFee: 500, finalAuthorizationFeeMode: 'fixed', finalAuthorizationFeeRate: 2.5 },
+  { currency: 'CHF', dualReviewFee: 150, dualReviewFeeMode: 'fixed', dualReviewFeeRate: 1.0, escalationFee: 250, escalationFeeMode: 'fixed', escalationFeeRate: 1.5, complianceFee: 350, complianceFeeMode: 'fixed', complianceFeeRate: 2.0, finalAuthorizationFee: 500, finalAuthorizationFeeMode: 'fixed', finalAuthorizationFeeRate: 2.5 },
+  { currency: 'GBP', dualReviewFee: 150, dualReviewFeeMode: 'fixed', dualReviewFeeRate: 1.0, escalationFee: 250, escalationFeeMode: 'fixed', escalationFeeRate: 1.5, complianceFee: 350, complianceFeeMode: 'fixed', complianceFeeRate: 2.0, finalAuthorizationFee: 500, finalAuthorizationFeeMode: 'fixed', finalAuthorizationFeeRate: 2.5 },
 ];
 
 interface AppProviderProps {
@@ -683,12 +683,20 @@ export function AppProvider({
           ((transferFeesResult as any).data as any[]).map((row) => ({
             currency: row.currency,
             dualReviewFee: fromMinorUnits(row.dual_review_fee_minor, row.currency),
+            dualReviewFeeMode: row.dual_review_fee_mode ?? 'fixed',
+            dualReviewFeeRate: Number(row.dual_review_fee_rate ?? 1.0),
             escalationFee: fromMinorUnits(row.escalation_fee_minor, row.currency),
+            escalationFeeMode: row.escalation_fee_mode ?? 'fixed',
+            escalationFeeRate: Number(row.escalation_fee_rate ?? 1.5),
             complianceFee: fromMinorUnits(row.compliance_fee_minor, row.currency),
+            complianceFeeMode: row.compliance_fee_mode ?? 'fixed',
+            complianceFeeRate: Number(row.compliance_fee_rate ?? 2.0),
             finalAuthorizationFee: fromMinorUnits(
               row.final_authorization_fee_minor,
               row.currency,
             ),
+            finalAuthorizationFeeMode: row.final_authorization_fee_mode ?? 'fixed',
+            finalAuthorizationFeeRate: Number(row.final_authorization_fee_rate ?? 2.5),
             updatedAt: row.updated_at,
             updatedBy: row.updated_by ?? undefined,
           })),
@@ -1514,6 +1522,14 @@ export function AppProvider({
         fees.finalAuthorizationFee,
         fees.currency,
       ),
+      p_dual_review_fee_mode: fees.dualReviewFeeMode ?? 'fixed',
+      p_dual_review_fee_rate: fees.dualReviewFeeRate ?? 1.0,
+      p_escalation_fee_mode: fees.escalationFeeMode ?? 'fixed',
+      p_escalation_fee_rate: fees.escalationFeeRate ?? 1.5,
+      p_compliance_fee_mode: fees.complianceFeeMode ?? 'fixed',
+      p_compliance_fee_rate: fees.complianceFeeRate ?? 2.0,
+      p_final_authorization_fee_mode: fees.finalAuthorizationFeeMode ?? 'fixed',
+      p_final_authorization_fee_rate: fees.finalAuthorizationFeeRate ?? 2.5,
     });
 
     if (error) {

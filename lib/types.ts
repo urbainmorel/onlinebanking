@@ -332,12 +332,22 @@ export interface CurrencyRates {
   updatedAt: string;
 }
 
+export type TransferFeeMode = 'fixed' | 'percentage';
+
 export interface TransferControlFees {
   currency: Currency;
   dualReviewFee: number;
+  dualReviewFeeMode: TransferFeeMode;
+  dualReviewFeeRate: number;
   escalationFee: number;
+  escalationFeeMode: TransferFeeMode;
+  escalationFeeRate: number;
   complianceFee: number;
+  complianceFeeMode: TransferFeeMode;
+  complianceFeeRate: number;
   finalAuthorizationFee: number;
+  finalAuthorizationFeeMode: TransferFeeMode;
+  finalAuthorizationFeeRate: number;
   updatedAt?: string;
   updatedBy?: string;
 }
