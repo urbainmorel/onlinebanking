@@ -5,17 +5,16 @@ import { useAppStore } from '@/lib/store';
 import {
   ArrowRightLeft,
   BadgePercent,
-  Database,
+  ChevronLeft,
+  ChevronRight,
   Hash,
+  KeyRound,
+  Palette,
   Save,
   Settings,
-  ShieldCheck,
 } from 'lucide-react';
-import { isPublicSupabaseConfigured } from '@/lib/supabase/config';
 import BrandSettingsEditor from '@/components/brand/BrandSettingsEditor';
-import type { ExchangeRateSnapshot } from '@/lib/currency';
 import AdminCredentialsSettings from '@/components/AdminCredentialsSettings';
-
 
 interface FeeSettingsDraft {
   dualReviewFee: number;
@@ -83,21 +82,83 @@ const loanReferenceDate = () => {
   ].join('');
 };
 
+type SettingsSection = 'brand' | 'fees' | 'loans' | 'accounts' | 'security';
+
+interface SectionMeta {
+  id: SettingsSection;
+  title: string;
+  badge?: string;
+  description: string;
+  icon: React.ElementType;
+  iconBg: string;
+  iconColor: string;
+}
+
+const SETTINGS_SECTIONS: readonly SectionMeta[] = [
+  {
+    id: 'brand',
+    title: 'Marque & Identité',
+    description: 'Nom d’établissement, logos clair/sombre, favicon et documents',
+    icon: Palette,
+    iconBg: 'bg-purple-100',
+    iconColor: 'text-purple-600',
+  },
+  {
+    id: 'fees',
+    title: 'Frais des virements',
+    badge: '4 étapes',
+    description: 'Montants fixes ou pourcentages appliqués à chaque étape',
+    icon: ArrowRightLeft,
+    iconBg: 'bg-blue-100',
+    iconColor: 'text-blue-600',
+  },
+  {
+    id: 'loans',
+    title: 'Produits de Prêt',
+    badge: '5 devises',
+    description: 'Limites, TAEG fixe, durées et format des références de crédit',
+    icon: BadgePercent,
+    iconBg: 'bg-emerald-100',
+    iconColor: 'text-emerald-600',
+  },
+  {
+    id: 'accounts',
+    title: 'Numéros de compte',
+    description: 'Format automatique à 10 chiffres et calcul de capacité',
+    icon: Hash,
+    iconBg: 'bg-indigo-100',
+    iconColor: 'text-indigo-600',
+  },
+  {
+    id: 'security',
+    title: 'Accès Administrateur',
+    description: 'Identifiants de connexion, adresse e-mail et mot de passe',
+    icon: KeyRound,
+    iconBg: 'bg-amber-100',
+    iconColor: 'text-amber-600',
+  },
+];
+
 export default function AdminSettingsView() {
   const {
-    rates,
     accountNumberConfiguration,
     updateAccountNumberPrefix,
     loanProductSettings,
     updateLoanProductSettings,
     transferControlFees,
-    updateTransferControlFees,
     updateUniversalTransferControlFees,
   } = useAppStore();
-  const configured = isPublicSupabaseConfigured();
+
+  const [activeSection, setActiveSection] = useState<SettingsSection>('fees');
+  const [mobileView, setMobileView] = useState<'menu' | 'content'>('menu');
+
+  // Prefix & accounts state
   const [draftPrefix, setDraftPrefix] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState('');
+  const prefix = draftPrefix ?? accountNumberConfiguration?.prefix ?? '';
+
+  // Loan settings state
   const [selectedLoanCurrency, setSelectedLoanCurrency] =
     useState<LoanCurrency>('EUR');
   const [loanDraft, setLoanDraft] = useState<LoanSettingsDraft>(() =>
@@ -108,10 +169,6 @@ export default function AdminSettingsView() {
     type: 'success' | 'error';
     message: string;
   } | null>(null);
-  const prefix = draftPrefix ?? accountNumberConfiguration?.prefix ?? '';
-  const rateSnapshot = rates as typeof rates & Partial<ExchangeRateSnapshot>;
-  const rateProvider = rateSnapshot.provider ?? 'Source non renseignée';
-  const rateDate = rateSnapshot.date ?? rates.updatedAt.slice(0, 10);
 
   const selectedLoanSettings = useMemo(
     () =>
@@ -227,7 +284,7 @@ export default function AdminSettingsView() {
     }
   };
 
-
+  // Fees state & logic
   const [feeDraft, setFeeDraft] = useState<FeeSettingsDraft>(() =>
     defaultFeeDraft(),
   );
@@ -293,7 +350,7 @@ export default function AdminSettingsView() {
       });
       setFeeFeedback({
         type: 'success',
-        message: 'Paramètres des frais enregistrés avec succès. Ils sont automatiquement appliqués dans la devise de chaque virement.',
+        message: 'Paramètres des frais de contrôle enregistrés avec succès.',
       });
     } catch (err: unknown) {
       setFeeFeedback({
@@ -350,176 +407,551 @@ export default function AdminSettingsView() {
     }
   };
 
-  return (
-    <div className="min-w-0 space-y-6">
-      <header className="rounded-3xl bg-slate-900 p-4 text-white sm:p-6">
-        <div className="flex items-center gap-2 text-blue-300 text-xs font-bold uppercase">
-          <Settings className="w-4 h-4" />
-          <span>Configuration de déploiement</span>
-        </div>
-        <h1 className="text-2xl font-extrabold mt-1">Paramètres techniques</h1>
-      </header>
+  const activeMeta = useMemo(
+    () => SETTINGS_SECTIONS.find((s) => s.id === activeSection) ?? SETTINGS_SECTIONS[0],
+    [activeSection],
+  );
 
-      <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <BrandSettingsEditor />
-        <AdminCredentialsSettings />
-        <form
-          onSubmit={submitLoanSettings}
-          className="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 sm:p-6 md:col-span-2"
-        >
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <BadgePercent className="h-8 w-8 text-blue-600" />
-              <h2 className="mt-4 font-extrabold text-slate-900">
-                Paramètres du prêt
-              </h2>
-              <p className="mt-1 max-w-2xl text-xs text-slate-500">
-                Définissez les limites du simulateur, le TAEG fixe et le format
-                des prochaines références pour chaque devise.
-              </p>
+  const renderActiveSectionContent = () => {
+    switch (activeSection) {
+      case 'brand':
+        return <BrandSettingsEditor />;
+
+      case 'security':
+        return <AdminCredentialsSettings />;
+
+      case 'fees':
+        return (
+          <form
+            onSubmit={submitFeeSettings}
+            className="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-blue-100 text-blue-600">
+                <ArrowRightLeft className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="font-extrabold text-slate-900 text-base sm:text-lg">
+                  Frais des étapes de contrôle de virement
+                </h2>
+                <p className="text-xs text-slate-500 font-medium">
+                  Définissez un montant fixe ou un pourcentage (%) appliqué à chaque étape de validation.
+                </p>
+              </div>
             </div>
-            <label className="text-xs font-bold text-slate-800 sm:min-w-40">
-              Devise
-              <select
-                value={selectedLoanCurrency}
-                onChange={(event) => {
-                  const currency = event.target.value as LoanCurrency;
-                  setSelectedLoanCurrency(currency);
-                  setLoanFeedback(null);
-                }}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm font-bold text-slate-900"
+
+            <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {/* Étape 1 : Double validation interne */}
+              <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-slate-50/50 p-4">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600">Étape 1</span>
+                    <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-800">40%</span>
+                  </div>
+                  <h3 className="mt-2 text-xs font-extrabold text-slate-900">Double validation interne</h3>
+
+                  {/* Mode Selector */}
+                  <div className="mt-3 flex rounded-xl bg-slate-200/80 p-0.5 text-[11px] font-bold">
+                    <button
+                      type="button"
+                      onClick={() => updateFeeDraft('dualReviewFeeMode', 'fixed')}
+                      className={`flex-1 rounded-lg py-1 transition-colors ${
+                        feeDraft.dualReviewFeeMode === 'fixed'
+                          ? 'bg-white text-blue-700 shadow-sm'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Montant fixe
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateFeeDraft('dualReviewFeeMode', 'percentage')}
+                      className={`flex-1 rounded-lg py-1 transition-colors ${
+                        feeDraft.dualReviewFeeMode === 'percentage'
+                          ? 'bg-white text-blue-700 shadow-sm'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Pourcentage (%)
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  {feeDraft.dualReviewFeeMode === 'fixed' ? (
+                    <label className="block">
+                      <span className="text-[11px] font-bold text-slate-700">Montant fixe</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step="any"
+                        required
+                        value={feeDraft.dualReviewFee}
+                        onChange={(e) => updateFeeDraft('dualReviewFee', Number(e.target.value))}
+                        className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5 font-mono text-sm font-semibold text-slate-900 shadow-sm"
+                        placeholder="150"
+                      />
+                    </label>
+                  ) : (
+                    <div>
+                      <label className="block">
+                        <span className="text-[11px] font-bold text-slate-700">Taux en % du virement</span>
+                        <div className="relative mt-1">
+                          <input
+                            type="number"
+                            min={0}
+                            max={100}
+                            step="0.01"
+                            required
+                            value={feeDraft.dualReviewFeeRate}
+                            onChange={(e) => updateFeeDraft('dualReviewFeeRate', Number(e.target.value))}
+                            className="w-full rounded-xl border border-slate-300 bg-white p-2.5 pr-8 font-mono text-sm font-semibold text-slate-900 shadow-sm"
+                            placeholder="1.00"
+                          />
+                          <span className="absolute right-3 top-2.5 font-mono text-sm font-bold text-slate-400">%</span>
+                        </div>
+                      </label>
+                      <p className="mt-1.5 text-[10px] text-blue-700 font-medium bg-blue-50/80 rounded-lg p-1.5">
+                        💡 Ex: {((10000 * feeDraft.dualReviewFeeRate) / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} pour 10 000
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Étape 2 : Escalade hiérarchique */}
+              <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-slate-50/50 p-4">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600">Étape 2</span>
+                    <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-bold text-indigo-800">60%</span>
+                  </div>
+                  <h3 className="mt-2 text-xs font-extrabold text-slate-900">Escalade hiérarchique</h3>
+
+                  {/* Mode Selector */}
+                  <div className="mt-3 flex rounded-xl bg-slate-200/80 p-0.5 text-[11px] font-bold">
+                    <button
+                      type="button"
+                      onClick={() => updateFeeDraft('escalationFeeMode', 'fixed')}
+                      className={`flex-1 rounded-lg py-1 transition-colors ${
+                        feeDraft.escalationFeeMode === 'fixed'
+                          ? 'bg-white text-indigo-700 shadow-sm'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Montant fixe
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateFeeDraft('escalationFeeMode', 'percentage')}
+                      className={`flex-1 rounded-lg py-1 transition-colors ${
+                        feeDraft.escalationFeeMode === 'percentage'
+                          ? 'bg-white text-indigo-700 shadow-sm'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Pourcentage (%)
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  {feeDraft.escalationFeeMode === 'fixed' ? (
+                    <label className="block">
+                      <span className="text-[11px] font-bold text-slate-700">Montant fixe</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step="any"
+                        required
+                        value={feeDraft.escalationFee}
+                        onChange={(e) => updateFeeDraft('escalationFee', Number(e.target.value))}
+                        className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5 font-mono text-sm font-semibold text-slate-900 shadow-sm"
+                        placeholder="250"
+                      />
+                    </label>
+                  ) : (
+                    <div>
+                      <label className="block">
+                        <span className="text-[11px] font-bold text-slate-700">Taux en % du virement</span>
+                        <div className="relative mt-1">
+                          <input
+                            type="number"
+                            min={0}
+                            max={100}
+                            step="0.01"
+                            required
+                            value={feeDraft.escalationFeeRate}
+                            onChange={(e) => updateFeeDraft('escalationFeeRate', Number(e.target.value))}
+                            className="w-full rounded-xl border border-slate-300 bg-white p-2.5 pr-8 font-mono text-sm font-semibold text-slate-900 shadow-sm"
+                            placeholder="1.50"
+                          />
+                          <span className="absolute right-3 top-2.5 font-mono text-sm font-bold text-slate-400">%</span>
+                        </div>
+                      </label>
+                      <p className="mt-1.5 text-[10px] text-indigo-700 font-medium bg-indigo-50/80 rounded-lg p-1.5">
+                        💡 Ex: {((10000 * feeDraft.escalationFeeRate) / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} pour 10 000
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Étape 3 : Contrôle conformité */}
+              <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-slate-50/50 p-4">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600">Étape 3</span>
+                    <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-800">75%</span>
+                  </div>
+                  <h3 className="mt-2 text-xs font-extrabold text-slate-900">Contrôle conformité</h3>
+
+                  {/* Mode Selector */}
+                  <div className="mt-3 flex rounded-xl bg-slate-200/80 p-0.5 text-[11px] font-bold">
+                    <button
+                      type="button"
+                      onClick={() => updateFeeDraft('complianceFeeMode', 'fixed')}
+                      className={`flex-1 rounded-lg py-1 transition-colors ${
+                        feeDraft.complianceFeeMode === 'fixed'
+                          ? 'bg-white text-purple-700 shadow-sm'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Montant fixe
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateFeeDraft('complianceFeeMode', 'percentage')}
+                      className={`flex-1 rounded-lg py-1 transition-colors ${
+                        feeDraft.complianceFeeMode === 'percentage'
+                          ? 'bg-white text-purple-700 shadow-sm'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Pourcentage (%)
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  {feeDraft.complianceFeeMode === 'fixed' ? (
+                    <label className="block">
+                      <span className="text-[11px] font-bold text-slate-700">Montant fixe</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step="any"
+                        required
+                        value={feeDraft.complianceFee}
+                        onChange={(e) => updateFeeDraft('complianceFee', Number(e.target.value))}
+                        className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5 font-mono text-sm font-semibold text-slate-900 shadow-sm"
+                        placeholder="350"
+                      />
+                    </label>
+                  ) : (
+                    <div>
+                      <label className="block">
+                        <span className="text-[11px] font-bold text-slate-700">Taux en % du virement</span>
+                        <div className="relative mt-1">
+                          <input
+                            type="number"
+                            min={0}
+                            max={100}
+                            step="0.01"
+                            required
+                            value={feeDraft.complianceFeeRate}
+                            onChange={(e) => updateFeeDraft('complianceFeeRate', Number(e.target.value))}
+                            className="w-full rounded-xl border border-slate-300 bg-white p-2.5 pr-8 font-mono text-sm font-semibold text-slate-900 shadow-sm"
+                            placeholder="2.00"
+                          />
+                          <span className="absolute right-3 top-2.5 font-mono text-sm font-bold text-slate-400">%</span>
+                        </div>
+                      </label>
+                      <p className="mt-1.5 text-[10px] text-purple-700 font-medium bg-purple-50/80 rounded-lg p-1.5">
+                        💡 Ex: {((10000 * feeDraft.complianceFeeRate) / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} pour 10 000
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Étape 4 : Autorisation finale */}
+              <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-slate-50/50 p-4">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">Étape 4</span>
+                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">90%</span>
+                  </div>
+                  <h3 className="mt-2 text-xs font-extrabold text-slate-900">Autorisation finale</h3>
+
+                  {/* Mode Selector */}
+                  <div className="mt-3 flex rounded-xl bg-slate-200/80 p-0.5 text-[11px] font-bold">
+                    <button
+                      type="button"
+                      onClick={() => updateFeeDraft('finalAuthorizationFeeMode', 'fixed')}
+                      className={`flex-1 rounded-lg py-1 transition-colors ${
+                        feeDraft.finalAuthorizationFeeMode === 'fixed'
+                          ? 'bg-white text-emerald-700 shadow-sm'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Montant fixe
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateFeeDraft('finalAuthorizationFeeMode', 'percentage')}
+                      className={`flex-1 rounded-lg py-1 transition-colors ${
+                        feeDraft.finalAuthorizationFeeMode === 'percentage'
+                          ? 'bg-white text-emerald-700 shadow-sm'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Pourcentage (%)
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  {feeDraft.finalAuthorizationFeeMode === 'fixed' ? (
+                    <label className="block">
+                      <span className="text-[11px] font-bold text-slate-700">Montant fixe</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step="any"
+                        required
+                        value={feeDraft.finalAuthorizationFee}
+                        onChange={(e) => updateFeeDraft('finalAuthorizationFee', Number(e.target.value))}
+                        className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5 font-mono text-sm font-semibold text-slate-900 shadow-sm"
+                        placeholder="500"
+                      />
+                    </label>
+                  ) : (
+                    <div>
+                      <label className="block">
+                        <span className="text-[11px] font-bold text-slate-700">Taux en % du virement</span>
+                        <div className="relative mt-1">
+                          <input
+                            type="number"
+                            min={0}
+                            max={100}
+                            step="0.01"
+                            required
+                            value={feeDraft.finalAuthorizationFeeRate}
+                            onChange={(e) => updateFeeDraft('finalAuthorizationFeeRate', Number(e.target.value))}
+                            className="w-full rounded-xl border border-slate-300 bg-white p-2.5 pr-8 font-mono text-sm font-semibold text-slate-900 shadow-sm"
+                            placeholder="2.50"
+                          />
+                          <span className="absolute right-3 top-2.5 font-mono text-sm font-bold text-slate-400">%</span>
+                        </div>
+                      </label>
+                      <p className="mt-1.5 text-[10px] text-emerald-700 font-medium bg-emerald-50/80 rounded-lg p-1.5">
+                        💡 Ex: {((10000 * feeDraft.finalAuthorizationFeeRate) / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} pour 10 000
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {feeFeedback && (
+              <p
+                className={`mt-4 rounded-xl p-3 text-xs font-medium ${
+                  feeFeedback.type === 'success'
+                    ? 'bg-emerald-50 text-emerald-800'
+                    : 'bg-rose-50 text-rose-700'
+                }`}
+                role={feeFeedback.type === 'error' ? 'alert' : 'status'}
               >
-                {LOAN_CURRENCIES.map((currency) => (
-                  <option key={currency} value={currency}>
-                    {currency}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+                {feeFeedback.message}
+              </p>
+            )}
 
-          <div className="mt-6 grid gap-5 lg:grid-cols-2">
-            <fieldset className="min-w-0 rounded-2xl border border-slate-100 bg-slate-50/70 p-3 sm:p-4">
-              <legend className="px-2 text-xs font-extrabold uppercase tracking-wide text-slate-700">
-                Montants
-              </legend>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="text-xs font-bold text-slate-800">
-                  Montant minimum ({loanDraft.currency})
-                  <input
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    value={loanDraft.minimumAmount}
-                    onChange={(event) =>
-                      updateLoanDraft('minimumAmount', Number(event.target.value))
-                    }
-                    aria-invalid={Boolean(loanErrors.minimumAmount)}
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm"
-                  />
-                  {loanErrors.minimumAmount && (
-                    <span className="mt-1 block text-[11px] font-medium text-rose-600">
-                      {loanErrors.minimumAmount}
-                    </span>
-                  )}
-                </label>
-                <label className="text-xs font-bold text-slate-800">
-                  Montant maximum ({loanDraft.currency})
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={loanDraft.maximumAmount}
-                    onChange={(event) =>
-                      updateLoanDraft('maximumAmount', Number(event.target.value))
-                    }
-                    aria-invalid={Boolean(loanErrors.maximumAmount)}
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm"
-                  />
-                  {loanErrors.maximumAmount && (
-                    <span className="mt-1 block text-[11px] font-medium text-rose-600">
-                      {loanErrors.maximumAmount}
-                    </span>
-                  )}
-                </label>
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <button
+                type="submit"
+                disabled={isSavingFee}
+                className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-xs font-bold text-white shadow-sm transition-all hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+              >
+                <Save className="h-4 w-4" />
+                {isSavingFee ? 'Enregistrement…' : 'Enregistrer les frais de contrôle'}
+              </button>
+              {universalFeeSettings?.updatedAt && (
+                <p className="text-[10px] text-slate-400">
+                  Dernière modification :{' '}
+                  {new Date(universalFeeSettings.updatedAt).toLocaleString('fr-FR')}
+                </p>
+              )}
+            </div>
+          </form>
+        );
+
+      case 'loans':
+        return (
+          <form
+            onSubmit={submitLoanSettings}
+            className="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm"
+          >
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600">
+                  <BadgePercent className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="font-extrabold text-slate-900 text-base sm:text-lg">
+                    Paramètres des produits de prêt
+                  </h2>
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    Limites du simulateur, TAEG fixe et format des références de contrat
+                  </p>
+                </div>
               </div>
-            </fieldset>
+              <label className="text-xs font-bold text-slate-800 sm:min-w-40">
+                Devise du produit
+                <select
+                  value={selectedLoanCurrency}
+                  onChange={(event) => {
+                    const currency = event.target.value as LoanCurrency;
+                    setSelectedLoanCurrency(currency);
+                    setLoanFeedback(null);
+                  }}
+                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-2.5 text-sm font-bold text-slate-900 shadow-sm"
+                >
+                  {LOAN_CURRENCIES.map((currency) => (
+                    <option key={currency} value={currency}>
+                      {currency}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
 
-            <fieldset className="min-w-0 rounded-2xl border border-slate-100 bg-slate-50/70 p-3 sm:p-4">
-              <legend className="px-2 text-xs font-extrabold uppercase tracking-wide text-slate-700">
-                Durées
-              </legend>
-              <div className="grid gap-4 sm:grid-cols-3">
-                <label className="text-xs font-bold text-slate-800">
-                  Minimum (mois)
-                  <input
-                    type="number"
-                    min="1"
-                    step="1"
-                    value={loanDraft.minimumDurationMonths}
-                    onChange={(event) =>
-                      updateLoanDraft(
-                        'minimumDurationMonths',
-                        Number(event.target.value),
-                      )
-                    }
-                    aria-invalid={Boolean(loanErrors.minimumDurationMonths)}
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm"
-                  />
-                  {loanErrors.minimumDurationMonths && (
-                    <span className="mt-1 block text-[11px] font-medium text-rose-600">
-                      {loanErrors.minimumDurationMonths}
-                    </span>
-                  )}
-                </label>
-                <label className="text-xs font-bold text-slate-800">
-                  Maximum (mois)
-                  <input
-                    type="number"
-                    min="1"
-                    step="1"
-                    value={loanDraft.maximumDurationMonths}
-                    onChange={(event) =>
-                      updateLoanDraft(
-                        'maximumDurationMonths',
-                        Number(event.target.value),
-                      )
-                    }
-                    aria-invalid={Boolean(loanErrors.maximumDurationMonths)}
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm"
-                  />
-                  {loanErrors.maximumDurationMonths && (
-                    <span className="mt-1 block text-[11px] font-medium text-rose-600">
-                      {loanErrors.maximumDurationMonths}
-                    </span>
-                  )}
-                </label>
-                <label className="text-xs font-bold text-slate-800">
-                  Pas (mois)
-                  <input
-                    type="number"
-                    min="1"
-                    step="1"
-                    value={loanDraft.durationStepMonths}
-                    onChange={(event) =>
-                      updateLoanDraft('durationStepMonths', Number(event.target.value))
-                    }
-                    aria-invalid={Boolean(loanErrors.durationStepMonths)}
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm"
-                  />
-                  {loanErrors.durationStepMonths && (
-                    <span className="mt-1 block text-[11px] font-medium text-rose-600">
-                      {loanErrors.durationStepMonths}
-                    </span>
-                  )}
-                </label>
-              </div>
-            </fieldset>
+            <div className="mt-6 grid gap-5 lg:grid-cols-2">
+              <fieldset className="min-w-0 rounded-2xl border border-slate-100 bg-slate-50/70 p-3 sm:p-4">
+                <legend className="px-2 text-xs font-extrabold uppercase tracking-wide text-slate-700">
+                  Montants
+                </legend>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="text-xs font-bold text-slate-800">
+                    Montant minimum ({loanDraft.currency})
+                    <input
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      value={loanDraft.minimumAmount}
+                      onChange={(event) =>
+                        updateLoanDraft('minimumAmount', Number(event.target.value))
+                      }
+                      aria-invalid={Boolean(loanErrors.minimumAmount)}
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm"
+                    />
+                    {loanErrors.minimumAmount && (
+                      <span className="mt-1 block text-[11px] font-medium text-rose-600">
+                        {loanErrors.minimumAmount}
+                      </span>
+                    )}
+                  </label>
+                  <label className="text-xs font-bold text-slate-800">
+                    Montant maximum ({loanDraft.currency})
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={loanDraft.maximumAmount}
+                      onChange={(event) =>
+                        updateLoanDraft('maximumAmount', Number(event.target.value))
+                      }
+                      aria-invalid={Boolean(loanErrors.maximumAmount)}
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm"
+                    />
+                    {loanErrors.maximumAmount && (
+                      <span className="mt-1 block text-[11px] font-medium text-rose-600">
+                        {loanErrors.maximumAmount}
+                      </span>
+                    )}
+                  </label>
+                </div>
+              </fieldset>
 
-            <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
-              <label className="text-xs font-bold text-slate-800">
-                TAEG fixe (%)
-                <div className="relative mt-1">
+              <fieldset className="min-w-0 rounded-2xl border border-slate-100 bg-slate-50/70 p-3 sm:p-4">
+                <legend className="px-2 text-xs font-extrabold uppercase tracking-wide text-slate-700">
+                  Durées
+                </legend>
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <label className="text-xs font-bold text-slate-800">
+                    Minimum (mois)
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={loanDraft.minimumDurationMonths}
+                      onChange={(event) =>
+                        updateLoanDraft(
+                          'minimumDurationMonths',
+                          Number(event.target.value),
+                        )
+                      }
+                      aria-invalid={Boolean(loanErrors.minimumDurationMonths)}
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm"
+                    />
+                    {loanErrors.minimumDurationMonths && (
+                      <span className="mt-1 block text-[11px] font-medium text-rose-600">
+                        {loanErrors.minimumDurationMonths}
+                      </span>
+                    )}
+                  </label>
+                  <label className="text-xs font-bold text-slate-800">
+                    Maximum (mois)
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={loanDraft.maximumDurationMonths}
+                      onChange={(event) =>
+                        updateLoanDraft(
+                          'maximumDurationMonths',
+                          Number(event.target.value),
+                        )
+                      }
+                      aria-invalid={Boolean(loanErrors.maximumDurationMonths)}
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm"
+                    />
+                    {loanErrors.maximumDurationMonths && (
+                      <span className="mt-1 block text-[11px] font-medium text-rose-600">
+                        {loanErrors.maximumDurationMonths}
+                      </span>
+                    )}
+                  </label>
+                  <label className="text-xs font-bold text-slate-800">
+                    Pas (mois)
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={loanDraft.durationStepMonths}
+                      onChange={(event) =>
+                        updateLoanDraft(
+                          'durationStepMonths',
+                          Number(event.target.value),
+                        )
+                      }
+                      aria-invalid={Boolean(loanErrors.durationStepMonths)}
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm"
+                    />
+                    {loanErrors.durationStepMonths && (
+                      <span className="mt-1 block text-[11px] font-medium text-rose-600">
+                        {loanErrors.durationStepMonths}
+                      </span>
+                    )}
+                  </label>
+                </div>
+              </fieldset>
+            </div>
+
+            <div className="mt-5 grid gap-5 lg:grid-cols-2">
+              <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+                <label className="text-xs font-bold text-slate-800">
+                  TAEG fixe (%)
                   <input
                     type="number"
                     min="0"
@@ -533,603 +965,341 @@ export default function AdminSettingsView() {
                       )
                     }
                     aria-invalid={Boolean(loanErrors.fixedAnnualRatePercent)}
-                    className="w-full rounded-xl border border-slate-200 bg-white p-3 pr-10 text-sm"
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm"
                   />
-                  <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-bold text-slate-400">
-                    %
-                  </span>
+                  {loanErrors.fixedAnnualRatePercent && (
+                    <span className="mt-1 block text-[11px] font-medium text-rose-600">
+                      {loanErrors.fixedAnnualRatePercent}
+                    </span>
+                  )}
+                </label>
+              </div>
+
+              <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+                <label className="text-xs font-bold text-slate-800">
+                  Préfixe de référence
+                  <input
+                    type="text"
+                    maxLength={24}
+                    value={loanDraft.referencePrefix}
+                    onChange={(event) =>
+                      updateLoanDraft('referencePrefix', event.target.value)
+                    }
+                    aria-invalid={Boolean(loanErrors.referencePrefix)}
+                    placeholder="Monalyz-"
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 font-mono text-sm"
+                  />
+                  {loanErrors.referencePrefix && (
+                    <span className="mt-1 block text-[11px] font-medium text-rose-600">
+                      {loanErrors.referencePrefix}
+                    </span>
+                  )}
+                </label>
+                <div className="mt-3 rounded-xl bg-white p-3">
+                  <p className="text-[10px] font-bold uppercase text-slate-400">
+                    Aperçu d’une prochaine référence
+                  </p>
+                  <p className="mt-1 break-all font-mono text-sm font-bold text-slate-900">
+                    {loanErrors.referencePrefix
+                      ? '—'
+                      : `${loanDraft.referencePrefix.trim()}${loanReferenceDate()}-<identifiant unique>`}
+                  </p>
                 </div>
-                {loanErrors.fixedAnnualRatePercent && (
-                  <span className="mt-1 block text-[11px] font-medium text-rose-600">
-                    {loanErrors.fixedAnnualRatePercent}
-                  </span>
-                )}
-                <span className="mt-1 block text-[11px] font-normal text-slate-500">
-                  Ce taux sera converti et enregistré sous forme décimale.
-                </span>
-              </label>
+              </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+            <div className="mt-5 flex flex-col gap-4 rounded-2xl border border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs font-extrabold text-slate-900">
+                  Disponibilité du produit
+                </p>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  Un produit inactif ne peut plus recevoir de nouvelles demandes.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={loanDraft.isActive}
+                onClick={() => updateLoanDraft('isActive', !loanDraft.isActive)}
+                className={`inline-flex min-h-11 w-full min-w-28 items-center justify-center rounded-full px-4 py-2 text-xs font-bold transition-colors sm:w-auto ${
+                  loanDraft.isActive
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : 'bg-slate-200 text-slate-600'
+                }`}
+              >
+                {loanDraft.isActive ? 'Actif' : 'Inactif'}
+              </button>
+            </div>
+
+            {loanFeedback && (
+              <p
+                className={`mt-4 rounded-xl p-3 text-xs font-medium ${
+                  loanFeedback.type === 'success'
+                    ? 'bg-emerald-50 text-emerald-800'
+                    : 'bg-rose-50 text-rose-700'
+                }`}
+                role={loanFeedback.type === 'error' ? 'alert' : 'status'}
+              >
+                {loanFeedback.message}
+              </p>
+            )}
+
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <button
+                type="submit"
+                disabled={isSavingLoan || Object.keys(loanErrors).length > 0}
+                className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-xs font-bold text-white shadow-sm transition-all hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+              >
+                <Save className="h-4 w-4" />
+                {isSavingLoan ? 'Enregistrement…' : 'Enregistrer les paramètres du prêt'}
+              </button>
+              {selectedLoanSettings?.updatedAt && (
+                <p className="text-[10px] text-slate-400">
+                  Dernière modification :{' '}
+                  {new Date(selectedLoanSettings.updatedAt).toLocaleString('fr-FR')}
+                </p>
+              )}
+            </div>
+          </form>
+        );
+
+      case 'accounts':
+        return (
+          <form
+            onSubmit={submitPrefix}
+            className="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-600">
+                <Hash className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="font-extrabold text-slate-900 text-base sm:text-lg">
+                  Numéros de compte automatiques
+                </h2>
+                <p className="text-[11px] text-slate-500 font-medium">
+                  Règles de génération des nouveaux comptes bancaires clients
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-500 mt-3 max-w-2xl">
+              Les prochains numéros comporteront exactement 10 chiffres : ce préfixe,
+              suivi d’un suffixe aléatoire unique.
+            </p>
+
+            <div className="mt-5 grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
               <label className="text-xs font-bold text-slate-800">
-                Préfixe de référence
+                Préfixe global (5 à 9 chiffres)
                 <input
-                  type="text"
-                  maxLength={24}
-                  value={loanDraft.referencePrefix}
+                  required
+                  inputMode="numeric"
+                  minLength={5}
+                  maxLength={9}
+                  pattern="[0-9]{5,9}"
+                  value={prefix}
                   onChange={(event) =>
-                    updateLoanDraft('referencePrefix', event.target.value)
+                    setDraftPrefix(event.target.value.replace(/\D/g, '').slice(0, 9))
                   }
-                  aria-invalid={Boolean(loanErrors.referencePrefix)}
-                  placeholder="Monalyz-"
-                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 font-mono text-sm"
+                  className="mt-1 w-full rounded-xl border border-slate-300 p-3 font-mono text-base tracking-widest shadow-sm"
+                  placeholder="12345"
                 />
-                {loanErrors.referencePrefix && (
-                  <span className="mt-1 block text-[11px] font-medium text-rose-600">
-                    {loanErrors.referencePrefix}
-                  </span>
-                )}
               </label>
-              <div className="mt-3 rounded-xl bg-white p-3">
-                <p className="text-[10px] font-bold uppercase text-slate-400">
-                  Aperçu d’une prochaine référence
-                </p>
-                <p className="mt-1 break-all font-mono text-sm font-bold text-slate-900">
-                  {loanErrors.referencePrefix
-                    ? '—'
-                    : `${loanDraft.referencePrefix.trim()}${loanReferenceDate()}-<identifiant unique>`}
-                </p>
+              <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl bg-slate-50 p-4 border border-slate-100">
+                  <p className="text-[10px] uppercase text-slate-500 font-bold">Exemple</p>
+                  <p className="mt-2 break-all font-mono font-bold text-slate-900">{example}</p>
+                </div>
+                <div className="rounded-2xl bg-slate-50 p-4 border border-slate-100">
+                  <p className="text-[10px] uppercase text-slate-500 font-bold">Capacité</p>
+                  <p className="mt-2 font-bold text-slate-900">
+                    {capacity?.toLocaleString('fr-FR') ?? '—'} comptes
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="mt-5 flex flex-col gap-4 rounded-2xl border border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-xs font-extrabold text-slate-900">
-                Disponibilité du produit
-              </p>
-              <p className="mt-1 text-[11px] text-slate-500">
-                Un produit inactif ne peut plus recevoir de nouvelles demandes.
-              </p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={loanDraft.isActive}
-              onClick={() => updateLoanDraft('isActive', !loanDraft.isActive)}
-              className={`inline-flex min-h-11 w-full min-w-28 items-center justify-center rounded-full px-4 py-2 text-xs font-bold transition-colors sm:w-auto ${
-                loanDraft.isActive
-                  ? 'bg-emerald-100 text-emerald-800'
-                  : 'bg-slate-200 text-slate-600'
-              }`}
-            >
-              {loanDraft.isActive ? 'Actif' : 'Inactif'}
-            </button>
-          </div>
-
-          {loanFeedback && (
-            <p
-              className={`mt-4 rounded-xl p-3 text-xs font-medium ${
-                loanFeedback.type === 'success'
-                  ? 'bg-emerald-50 text-emerald-800'
-                  : 'bg-rose-50 text-rose-700'
-              }`}
-              role={loanFeedback.type === 'error' ? 'alert' : 'status'}
-            >
-              {loanFeedback.message}
-            </p>
-          )}
-
-          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <button
-              type="submit"
-              disabled={isSavingLoan || Object.keys(loanErrors).length > 0}
-              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-            >
-              <Save className="h-4 w-4" />
-              {isSavingLoan ? 'Enregistrement…' : 'Enregistrer les paramètres du prêt'}
-            </button>
-            {selectedLoanSettings?.updatedAt && (
-              <p className="text-[10px] text-slate-400">
-                Dernière modification :{' '}
-                {new Date(selectedLoanSettings.updatedAt).toLocaleString('fr-FR')}
+            {capacity !== null && capacity <= 100 && (
+              <p className="mt-3 rounded-xl bg-amber-50 p-3 text-xs text-amber-800 font-medium">
+                Ce préfixe ne permet que {capacity} numéros. Choisissez un préfixe
+                plus court si davantage de comptes sont prévus.
               </p>
             )}
-          </div>
-        </form>
 
-        <form
-          onSubmit={submitFeeSettings}
-          className="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 sm:p-6 md:col-span-2"
-        >
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <ArrowRightLeft className="w-8 h-8 text-blue-600" />
-              <h2 className="font-extrabold text-slate-900 mt-4 text-base">
-                Frais des étapes de contrôle de virement
-              </h2>
-              <p className="text-xs text-slate-500 mt-1 max-w-3xl">
-                Configurez les frais exigés auprès du client pour franchir chaque étape de contrôle. Vous pouvez choisir pour chaque étape un montant fixe ou un pourcentage (%) du montant viré. Les frais sont <strong>automatiquement calculés et appliqués dans la devise exacte du virement du client</strong> (EUR, USD, CAD, CHF, GBP).
-              </p>
-            </div>
-            <div className="inline-flex items-center gap-2 rounded-2xl bg-blue-50 px-3.5 py-2 text-xs font-bold text-blue-800 border border-blue-100">
-              <ShieldCheck className="h-4 w-4 text-blue-600" />
-              <span>Devise automatique du virement</span>
-            </div>
-          </div>
-
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {/* Étape 1 : Double validation interne */}
-            <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-slate-50/50 p-4">
-              <div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600">Étape 1</span>
-                  <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-800">40%</span>
-                </div>
-                <h3 className="mt-2 text-xs font-extrabold text-slate-900">Double validation interne</h3>
-                <p className="mt-1 text-[11px] text-slate-500 leading-relaxed">
-                  Frais requis dès la soumission (Étape 0, 25%) pour déclencher la vérification des coordonnées cibles et de l'authenticité de l'ordre.
-                </p>
-
-                {/* Mode Selector */}
-                <div className="mt-3 flex rounded-xl bg-slate-200/80 p-0.5 text-[11px] font-bold">
-                  <button
-                    type="button"
-                    onClick={() => updateFeeDraft('dualReviewFeeMode', 'fixed')}
-                    className={`flex-1 rounded-lg py-1 transition-colors ${
-                      feeDraft.dualReviewFeeMode === 'fixed'
-                        ? 'bg-white text-blue-700 shadow-sm'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Montant fixe
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => updateFeeDraft('dualReviewFeeMode', 'percentage')}
-                    className={`flex-1 rounded-lg py-1 transition-colors ${
-                      feeDraft.dualReviewFeeMode === 'percentage'
-                        ? 'bg-white text-blue-700 shadow-sm'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Pourcentage (%)
-                  </button>
-                </div>
-              </div>
-
-              <div className="mt-4">
-                {feeDraft.dualReviewFeeMode === 'fixed' ? (
-                  <label className="block">
-                    <span className="text-[11px] font-bold text-slate-700">Montant fixe (devise du virement)</span>
-                    <input
-                      type="number"
-                      min={0}
-                      step="any"
-                      required
-                      value={feeDraft.dualReviewFee}
-                      onChange={(e) => updateFeeDraft('dualReviewFee', Number(e.target.value))}
-                      className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5 font-mono text-sm font-semibold text-slate-900 shadow-sm"
-                      placeholder="150"
-                    />
-                  </label>
-                ) : (
-                  <div>
-                    <label className="block">
-                      <span className="text-[11px] font-bold text-slate-700">Taux en % du virement</span>
-                      <div className="relative mt-1">
-                        <input
-                          type="number"
-                          min={0}
-                          max={100}
-                          step="0.01"
-                          required
-                          value={feeDraft.dualReviewFeeRate}
-                          onChange={(e) => updateFeeDraft('dualReviewFeeRate', Number(e.target.value))}
-                          className="w-full rounded-xl border border-slate-300 bg-white p-2.5 pr-8 font-mono text-sm font-semibold text-slate-900 shadow-sm"
-                          placeholder="1.00"
-                        />
-                        <span className="absolute right-3 top-2.5 font-mono text-sm font-bold text-slate-400">%</span>
-                      </div>
-                    </label>
-                    <p className="mt-1.5 text-[10px] text-blue-700 font-medium bg-blue-50/80 rounded-lg p-1.5">
-                      💡 Ex: {((10000 * feeDraft.dualReviewFeeRate) / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} devise pour 10 000 devise
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Étape 2 : Escalade hiérarchique */}
-            <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-slate-50/50 p-4">
-              <div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600">Étape 2</span>
-                  <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-bold text-indigo-800">60%</span>
-                </div>
-                <h3 className="mt-2 text-xs font-extrabold text-slate-900">Escalade hiérarchique</h3>
-                <p className="mt-1 text-[11px] text-slate-500 leading-relaxed">
-                  Frais requis après la double validation pour la revue managériale par la direction des opérations sur les flux sensibles.
-                </p>
-
-                {/* Mode Selector */}
-                <div className="mt-3 flex rounded-xl bg-slate-200/80 p-0.5 text-[11px] font-bold">
-                  <button
-                    type="button"
-                    onClick={() => updateFeeDraft('escalationFeeMode', 'fixed')}
-                    className={`flex-1 rounded-lg py-1 transition-colors ${
-                      feeDraft.escalationFeeMode === 'fixed'
-                        ? 'bg-white text-indigo-700 shadow-sm'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Montant fixe
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => updateFeeDraft('escalationFeeMode', 'percentage')}
-                    className={`flex-1 rounded-lg py-1 transition-colors ${
-                      feeDraft.escalationFeeMode === 'percentage'
-                        ? 'bg-white text-indigo-700 shadow-sm'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Pourcentage (%)
-                  </button>
-                </div>
-              </div>
-
-              <div className="mt-4">
-                {feeDraft.escalationFeeMode === 'fixed' ? (
-                  <label className="block">
-                    <span className="text-[11px] font-bold text-slate-700">Montant fixe (devise du virement)</span>
-                    <input
-                      type="number"
-                      min={0}
-                      step="any"
-                      required
-                      value={feeDraft.escalationFee}
-                      onChange={(e) => updateFeeDraft('escalationFee', Number(e.target.value))}
-                      className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5 font-mono text-sm font-semibold text-slate-900 shadow-sm"
-                      placeholder="250"
-                    />
-                  </label>
-                ) : (
-                  <div>
-                    <label className="block">
-                      <span className="text-[11px] font-bold text-slate-700">Taux en % du virement</span>
-                      <div className="relative mt-1">
-                        <input
-                          type="number"
-                          min={0}
-                          max={100}
-                          step="0.01"
-                          required
-                          value={feeDraft.escalationFeeRate}
-                          onChange={(e) => updateFeeDraft('escalationFeeRate', Number(e.target.value))}
-                          className="w-full rounded-xl border border-slate-300 bg-white p-2.5 pr-8 font-mono text-sm font-semibold text-slate-900 shadow-sm"
-                          placeholder="1.50"
-                        />
-                        <span className="absolute right-3 top-2.5 font-mono text-sm font-bold text-slate-400">%</span>
-                      </div>
-                    </label>
-                    <p className="mt-1.5 text-[10px] text-indigo-700 font-medium bg-indigo-50/80 rounded-lg p-1.5">
-                      💡 Ex: {((10000 * feeDraft.escalationFeeRate) / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} devise pour 10 000 devise
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Étape 3 : Contrôle conformité */}
-            <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-slate-50/50 p-4">
-              <div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600">Étape 3</span>
-                  <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-800">75%</span>
-                </div>
-                <h3 className="mt-2 text-xs font-extrabold text-slate-900">Contrôle conformité</h3>
-                <p className="mt-1 text-[11px] text-slate-500 leading-relaxed">
-                  Frais requis pour le respect strict des réglementations financières internationales et normes anti-blanchiment (AML/KYC).
-                </p>
-
-                {/* Mode Selector */}
-                <div className="mt-3 flex rounded-xl bg-slate-200/80 p-0.5 text-[11px] font-bold">
-                  <button
-                    type="button"
-                    onClick={() => updateFeeDraft('complianceFeeMode', 'fixed')}
-                    className={`flex-1 rounded-lg py-1 transition-colors ${
-                      feeDraft.complianceFeeMode === 'fixed'
-                        ? 'bg-white text-purple-700 shadow-sm'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Montant fixe
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => updateFeeDraft('complianceFeeMode', 'percentage')}
-                    className={`flex-1 rounded-lg py-1 transition-colors ${
-                      feeDraft.complianceFeeMode === 'percentage'
-                        ? 'bg-white text-purple-700 shadow-sm'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Pourcentage (%)
-                  </button>
-                </div>
-              </div>
-
-              <div className="mt-4">
-                {feeDraft.complianceFeeMode === 'fixed' ? (
-                  <label className="block">
-                    <span className="text-[11px] font-bold text-slate-700">Montant fixe (devise du virement)</span>
-                    <input
-                      type="number"
-                      min={0}
-                      step="any"
-                      required
-                      value={feeDraft.complianceFee}
-                      onChange={(e) => updateFeeDraft('complianceFee', Number(e.target.value))}
-                      className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5 font-mono text-sm font-semibold text-slate-900 shadow-sm"
-                      placeholder="350"
-                    />
-                  </label>
-                ) : (
-                  <div>
-                    <label className="block">
-                      <span className="text-[11px] font-bold text-slate-700">Taux en % du virement</span>
-                      <div className="relative mt-1">
-                        <input
-                          type="number"
-                          min={0}
-                          max={100}
-                          step="0.01"
-                          required
-                          value={feeDraft.complianceFeeRate}
-                          onChange={(e) => updateFeeDraft('complianceFeeRate', Number(e.target.value))}
-                          className="w-full rounded-xl border border-slate-300 bg-white p-2.5 pr-8 font-mono text-sm font-semibold text-slate-900 shadow-sm"
-                          placeholder="2.00"
-                        />
-                        <span className="absolute right-3 top-2.5 font-mono text-sm font-bold text-slate-400">%</span>
-                      </div>
-                    </label>
-                    <p className="mt-1.5 text-[10px] text-purple-700 font-medium bg-purple-50/80 rounded-lg p-1.5">
-                      💡 Ex: {((10000 * feeDraft.complianceFeeRate) / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} devise pour 10 000 devise
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Étape 4 : Autorisation finale */}
-            <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-slate-50/50 p-4">
-              <div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">Étape 4</span>
-                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">90%</span>
-                </div>
-                <h3 className="mt-2 text-xs font-extrabold text-slate-900">Autorisation finale</h3>
-                <p className="mt-1 text-[11px] text-slate-500 leading-relaxed">
-                  Frais requis pour l'arbitrage décisif certifiant la réunion de tous les prérequis légaux et ordonnant le déblocage effectif des fonds.
-                </p>
-
-                {/* Mode Selector */}
-                <div className="mt-3 flex rounded-xl bg-slate-200/80 p-0.5 text-[11px] font-bold">
-                  <button
-                    type="button"
-                    onClick={() => updateFeeDraft('finalAuthorizationFeeMode', 'fixed')}
-                    className={`flex-1 rounded-lg py-1 transition-colors ${
-                      feeDraft.finalAuthorizationFeeMode === 'fixed'
-                        ? 'bg-white text-emerald-700 shadow-sm'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Montant fixe
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => updateFeeDraft('finalAuthorizationFeeMode', 'percentage')}
-                    className={`flex-1 rounded-lg py-1 transition-colors ${
-                      feeDraft.finalAuthorizationFeeMode === 'percentage'
-                        ? 'bg-white text-emerald-700 shadow-sm'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Pourcentage (%)
-                  </button>
-                </div>
-              </div>
-
-              <div className="mt-4">
-                {feeDraft.finalAuthorizationFeeMode === 'fixed' ? (
-                  <label className="block">
-                    <span className="text-[11px] font-bold text-slate-700">Montant fixe (devise du virement)</span>
-                    <input
-                      type="number"
-                      min={0}
-                      step="any"
-                      required
-                      value={feeDraft.finalAuthorizationFee}
-                      onChange={(e) => updateFeeDraft('finalAuthorizationFee', Number(e.target.value))}
-                      className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5 font-mono text-sm font-semibold text-slate-900 shadow-sm"
-                      placeholder="500"
-                    />
-                  </label>
-                ) : (
-                  <div>
-                    <label className="block">
-                      <span className="text-[11px] font-bold text-slate-700">Taux en % du virement</span>
-                      <div className="relative mt-1">
-                        <input
-                          type="number"
-                          min={0}
-                          max={100}
-                          step="0.01"
-                          required
-                          value={feeDraft.finalAuthorizationFeeRate}
-                          onChange={(e) => updateFeeDraft('finalAuthorizationFeeRate', Number(e.target.value))}
-                          className="w-full rounded-xl border border-slate-300 bg-white p-2.5 pr-8 font-mono text-sm font-semibold text-slate-900 shadow-sm"
-                          placeholder="2.50"
-                        />
-                        <span className="absolute right-3 top-2.5 font-mono text-sm font-bold text-slate-400">%</span>
-                      </div>
-                    </label>
-                    <p className="mt-1.5 text-[10px] text-emerald-700 font-medium bg-emerald-50/80 rounded-lg p-1.5">
-                      💡 Ex: {((10000 * feeDraft.finalAuthorizationFeeRate) / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} devise pour 10 000 devise
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4 rounded-xl bg-blue-50/60 p-3 text-[11px] text-slate-600">
-            <span className="font-bold text-blue-900">Information d’exécution (Étape 5, 100%) & Refus :</span> À l'étape finale d'approbation et d'exécution, aucun frais supplémentaire n'est requis et le justificatif officiel (PDF Confirmation de virement) devient téléchargeable. En cas de rejet par la direction à n'importe quel stade, les frais préalablement engagés demeurent non remboursables.
-          </div>
-
-          {feeFeedback && (
-            <p
-              className={`mt-4 rounded-xl p-3 text-xs font-medium ${
-                feeFeedback.type === 'success'
-                  ? 'bg-emerald-50 text-emerald-800'
-                  : 'bg-rose-50 text-rose-700'
-              }`}
-              role={feeFeedback.type === 'error' ? 'alert' : 'status'}
-            >
-              {feeFeedback.message}
-            </p>
-          )}
-
-          <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <button
-              type="submit"
-              disabled={isSavingFee}
-              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-            >
-              <Save className="h-4 w-4" />
-              {isSavingFee ? 'Enregistrement…' : 'Enregistrer les frais de contrôle'}
-            </button>
-            {universalFeeSettings?.updatedAt && (
-              <p className="text-[10px] text-slate-400">
-                Dernière modification :{' '}
-                {new Date(universalFeeSettings.updatedAt).toLocaleString('fr-FR')}
+            {feedback && (
+              <p className="mt-3 text-xs text-slate-700 font-medium" role="status">
+                {feedback}
               </p>
             )}
-          </div>
-        </form>
 
-        <form
-          onSubmit={submitPrefix}
-          className="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 sm:p-6 md:col-span-2"
-        >
-          <Hash className="w-8 h-8 text-indigo-600" />
-          <h2 className="font-extrabold text-slate-900 mt-4">
-            Numéros de compte automatiques
-          </h2>
-          <p className="text-xs text-slate-500 mt-1 max-w-2xl">
-            Les prochains numéros comporteront exactement 10 chiffres : ce préfixe,
-            suivi d’un suffixe aléatoire unique.
-          </p>
-          <div className="mt-5 grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
-            <label className="text-xs font-bold text-slate-800">
-              Préfixe global (5 à 9 chiffres)
-              <input
-                required
-                inputMode="numeric"
-                minLength={5}
-                maxLength={9}
-                pattern="[0-9]{5,9}"
-                value={prefix}
-                onChange={(event) =>
-                  setDraftPrefix(event.target.value.replace(/\D/g, '').slice(0, 9))
-                }
-                className="mt-1 w-full rounded-xl border p-3 font-mono text-base tracking-widest"
-                placeholder="12345"
-              />
-            </label>
-            <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl bg-slate-50 p-4">
-                <p className="text-[10px] uppercase text-slate-500">Exemple</p>
-                <p className="mt-2 break-all font-mono font-bold text-slate-900">{example}</p>
-              </div>
-              <div className="rounded-2xl bg-slate-50 p-4">
-                <p className="text-[10px] uppercase text-slate-500">Capacité</p>
-                <p className="mt-2 font-bold text-slate-900">
-                  {capacity?.toLocaleString('fr-FR') ?? '—'} comptes
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <button
+                disabled={isSaving || capacity === null}
+                className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-xs font-bold text-white shadow-sm transition-all hover:bg-indigo-700 disabled:opacity-50 sm:w-auto"
+              >
+                <Save className="h-4 w-4" />
+                {isSaving ? 'Enregistrement…' : 'Enregistrer le préfixe'}
+              </button>
+              {accountNumberConfiguration?.updatedAt && (
+                <p className="text-[10px] text-slate-400">
+                  Dernière modification :{' '}
+                  {new Date(accountNumberConfiguration.updatedAt).toLocaleString('fr-FR')}
                 </p>
-              </div>
+              )}
+            </div>
+          </form>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="min-w-0 space-y-6">
+      <header className="rounded-3xl bg-slate-900 p-4 text-white sm:p-6 shadow-sm">
+        <div className="flex items-center gap-2 text-blue-300 text-xs font-bold uppercase tracking-wider">
+          <Settings className="w-4 h-4" />
+          <span>Administration bancaire</span>
+        </div>
+        <h1 className="text-xl sm:text-2xl font-extrabold mt-1">
+          Paramètres opérationnels
+        </h1>
+        <p className="text-xs text-slate-400 mt-1">
+          Gérez l’identité, la tarification des transferts, les règles de crédit et la sécurité de l'établissement.
+        </p>
+      </header>
+
+      {/* VUE MOBILE (< lg) : Hub d'accueil ou Vue de détail */}
+      <div className="lg:hidden">
+        {mobileView === 'menu' ? (
+          <div className="space-y-3">
+            <p className="px-1 text-xs font-bold uppercase tracking-wider text-slate-500">
+              Choisissez une rubrique à configurer
+            </p>
+            <div className="grid gap-3">
+              {SETTINGS_SECTIONS.map((section) => {
+                const Icon = section.icon;
+                return (
+                  <button
+                    key={section.id}
+                    type="button"
+                    onClick={() => {
+                      setActiveSection(section.id);
+                      setMobileView('content');
+                    }}
+                    className="group flex min-h-16 w-full items-center justify-between rounded-3xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-all hover:border-blue-300 hover:shadow-md active:scale-[0.99]"
+                  >
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <div
+                        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${section.iconBg} ${section.iconColor}`}
+                      >
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h2 className="text-sm font-extrabold text-slate-900 truncate">
+                            {section.title}
+                          </h2>
+                          {section.badge && (
+                            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-extrabold text-blue-800 shrink-0">
+                              {section.badge}
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-0.5 text-[11px] text-slate-500 line-clamp-1">
+                          {section.description}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="ml-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-400 transition-colors group-hover:bg-blue-50 group-hover:text-blue-600">
+                      <ChevronRight className="h-4 w-4" />
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
-          {capacity !== null && capacity <= 100 && (
-            <p className="mt-3 rounded-xl bg-amber-50 p-3 text-xs text-amber-800">
-              Ce préfixe ne permet que {capacity} numéros. Choisissez un préfixe
-              plus court si davantage de comptes sont prévus.
-            </p>
-          )}
-          {feedback && (
-            <p className="mt-3 text-xs text-slate-700" role="status">
-              {feedback}
-            </p>
-          )}
-          <button
-            disabled={isSaving || capacity === null}
-            className="mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-xs font-bold text-white disabled:opacity-50 sm:w-auto"
-          >
-            <Save className="h-4 w-4" />
-            {isSaving ? 'Enregistrement…' : 'Enregistrer le préfixe'}
-          </button>
-          {accountNumberConfiguration?.updatedAt && (
-            <p className="mt-3 text-[10px] text-slate-400">
-              Dernière modification :{' '}
-              {new Date(accountNumberConfiguration.updatedAt).toLocaleString('fr-FR')}
-            </p>
-          )}
-        </form>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setMobileView('menu')}
+                className="inline-flex min-h-11 items-center gap-2 rounded-2xl bg-white px-4 py-2 text-xs font-extrabold text-slate-700 border border-slate-200 shadow-sm transition-all hover:bg-slate-50 hover:text-slate-900 active:scale-95"
+              >
+                <ChevronLeft className="h-4 w-4 text-slate-500" />
+                <span>Toutes les rubriques</span>
+              </button>
+              <span className="text-xs font-extrabold text-slate-900 px-2 truncate">
+                {activeMeta.title}
+              </span>
+            </div>
 
-        <article className="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 sm:p-6">
-          <Database className={`w-8 h-8 ${configured ? 'text-emerald-600' : 'text-rose-600'}`} />
-          <h2 className="font-extrabold text-slate-900 mt-4">Backend Supabase</h2>
-          <p className="text-xs text-slate-500 mt-1">
-            {configured ? 'Variables publiques configurées.' : 'Configuration absente.'}
-          </p>
-          <p className="text-[11px] text-slate-500 mt-3">
-            Les clés sont définies par l&apos;environnement. Aucun utilisateur ne peut
-            modifier l&apos;URL ou la clé depuis le navigateur.
-          </p>
-        </article>
+            {renderActiveSectionContent()}
+          </div>
+        )}
+      </div>
 
-        <article className="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 sm:p-6">
-          <ShieldCheck className="w-8 h-8 text-blue-600" />
-          <h2 className="font-extrabold text-slate-900 mt-4">Source des taux</h2>
-          <p className="text-xs text-slate-500 mt-1">
-            {rateProvider} · taux du{' '}
-            {new Date(`${rateDate}T00:00:00.000Z`).toLocaleDateString('fr-FR', {
-              timeZone: 'UTC',
-            })}.
-          </p>
-          <p
-            className={`mt-3 text-[11px] ${
-              rateSnapshot.fallback ? 'text-amber-700' : 'text-slate-500'
-            }`}
-          >
-            {rateSnapshot.fallback
-              ? `Mode de secours actif. ${
-                  rateSnapshot.fallbackReason ??
-                  'Les taux embarqués sont utilisés temporairement.'
-                }`
-              : 'Taux de référence quotidiens récupérés côté serveur et mis en cache pendant une heure.'}
-          </p>
-          <a
-            href="https://frankfurter.dev/"
-            target="_blank"
-            rel="noreferrer"
-            className="mt-3 inline-flex min-h-11 items-center break-words text-[11px] font-bold text-blue-600 hover:text-blue-800"
-          >
-            Documentation officielle Frankfurter
-          </a>
-        </article>
-      </section>
+      {/* VUE DESKTOP (>= lg) : Master-Detail en 2 colonnes */}
+      <div className="hidden lg:grid lg:grid-cols-[300px_minmax(0,1fr)] lg:gap-6 lg:items-start">
+        {/* Navigation latérale fixe */}
+        <nav
+          className="sticky top-6 rounded-3xl border border-slate-200 bg-white p-3 shadow-sm space-y-1"
+          aria-label="Rubriques des paramètres"
+        >
+          <div className="px-3 py-2 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+            Rubriques de configuration
+          </div>
+          {SETTINGS_SECTIONS.map((section) => {
+            const Icon = section.icon;
+            const isActive = activeSection === section.id;
+            return (
+              <button
+                key={section.id}
+                type="button"
+                onClick={() => setActiveSection(section.id)}
+                className={`flex w-full items-center gap-3 rounded-2xl p-3 text-left transition-all ${
+                  isActive
+                    ? 'bg-blue-50/80 text-blue-900 font-extrabold ring-1 ring-blue-200 shadow-sm'
+                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-bold'
+                }`}
+              >
+                <div
+                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${section.iconBg} ${section.iconColor}`}
+                >
+                  <Icon className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs truncate">{section.title}</span>
+                    {section.badge && (
+                      <span
+                        className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                          isActive
+                            ? 'bg-blue-200/70 text-blue-800'
+                            : 'bg-slate-100 text-slate-600'
+                        }`}
+                      >
+                        {section.badge}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-slate-400 font-normal truncate mt-0.5">
+                    {section.description}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Zone de contenu dédiée */}
+        <div className="min-w-0">
+          {renderActiveSectionContent()}
+        </div>
+      </div>
     </div>
   );
 }
