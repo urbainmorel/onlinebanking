@@ -31,7 +31,7 @@ test('Frankfurter rows become a complete, dated EUR snapshot', () => {
   assert.equal(snapshot.rateDates.USD, '2026-08-07');
   assert.equal(snapshot.rateDates.EUR, '2026-08-08');
   assert.equal(snapshot.fallback, false);
-  assert.equal(Object.keys(snapshot.rates).length, 15);
+  assert.equal(Object.keys(snapshot.rates).length, 21);
   assert.deepEqual(parseExchangeRateSnapshot(snapshot), snapshot);
 });
 

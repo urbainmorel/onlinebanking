@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppStore } from '@/lib/store';
 import { translations } from '@/lib/i18n';
 import { bankingMessages } from '@/lib/banking-i18n';
-import type { TransferType } from '@/lib/types';
+import type { Language, TransferType } from '@/lib/types';
 import { convertAnyAmount, formatDirectCurrency } from '@/lib/currency';
 import { formatLocalizedDateTime } from '@/lib/language';
 import {
@@ -23,6 +23,28 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { useBranded } from '@/components/brand/BrandProvider';
 import { Dialog, DialogBackdrop, DialogPanel } from '@/components/ui/Dialog';
+
+const LATAM_COUNTRIES: Record<string, Record<Language, string>> = {
+  BRL: { fr: 'Brésil', en: 'Brazil', de: 'Brasilien', es: 'Brasil', it: 'Brasile', nl: 'Brazilië' },
+  MXN: { fr: 'Mexique', en: 'Mexico', de: 'Mexiko', es: 'México', it: 'Messico', nl: 'Mexico' },
+  ARS: { fr: 'Argentine', en: 'Argentina', de: 'Argentinien', es: 'Argentina', it: 'Argentina', nl: 'Argentinië' },
+  COP: { fr: 'Colombie', en: 'Colombia', de: 'Kolumbien', es: 'Colombia', it: 'Colombia', nl: 'Colombia' },
+  CLP: { fr: 'Chili', en: 'Chile', de: 'Chile', es: 'Chile', it: 'Cile', nl: 'Chili' },
+  PEN: { fr: 'Pérou', en: 'Peru', de: 'Peru', es: 'Perú', it: 'Perù', nl: 'Peru' },
+  UYU: { fr: 'Uruguay', en: 'Uruguay', de: 'Uruguay', es: 'Uruguay', it: 'Uruguay', nl: 'Uruguay' },
+  CRC: { fr: 'Costa Rica', en: 'Costa Rica', de: 'Costa Rica', es: 'Costa Rica', it: 'Costa Rica', nl: 'Costa Rica' },
+  PAB: { fr: 'Panama', en: 'Panama', de: 'Panama', es: 'Panamá', it: 'Panama', nl: 'Panama' },
+  DOP: { fr: 'Rép. Dominicaine', en: 'Dominican Rep.', de: 'Dom. Republik', es: 'Rep. Dominicana', it: 'Rep. Dominicana', nl: 'Dom. Republiek' },
+  USD: { fr: 'Équateur', en: 'Ecuador', de: 'Ecuador', es: 'Ecuador', it: 'Ecuador', nl: 'Ecuador' },
+};
+
+const AFRICA_COUNTRIES: Record<string, Record<Language, string>> = {
+  XOF: { fr: 'Sénégal / UEMOA', en: 'Senegal / WAEMU', de: 'Senegal / WAEMU', es: 'Senegal / UEMOA', it: 'Senegal / UEMOA', nl: 'Senegal / UEMOA' },
+  MAD: { fr: 'Maroc', en: 'Morocco', de: 'Marokko', es: 'Marruecos', it: 'Marocco', nl: 'Marokko' },
+  ZAR: { fr: 'Afrique du Sud', en: 'South Africa', de: 'Südafrika', es: 'Sudáfrica', it: 'Sudafrica', nl: 'Zuid-Afrika' },
+  EGP: { fr: 'Égypte', en: 'Egypt', de: 'Ägypten', es: 'Egipto', it: 'Egitto', nl: 'Egypte' },
+  NGN: { fr: 'Nigeria', en: 'Nigeria', de: 'Nigeria', es: 'Nigeria', it: 'Nigeria', nl: 'Nigeria' },
+};
 
 export default function WireTransferModal() {
   const {
@@ -248,7 +270,7 @@ export default function WireTransferModal() {
     } else if (transferType === 'uk') {
       recipientAccountStr = `Sort: ${routingNumber} | Acc: ${accountNumber}`;
     } else if (transferType === 'latam') {
-      recipientAccountStr = `CLABE/CPF: ${accountNumber} | Banque: ${iban}`;
+      recipientAccountStr = `Compte/ID: ${accountNumber} | Banque: ${iban}`;
     } else if (transferType === 'africa') {
       recipientAccountStr = `RIB/Acc: ${accountNumber} | BIC: ${bicSwift}`;
     }
@@ -806,11 +828,18 @@ export default function WireTransferModal() {
                               {[
                                 { code: 'BRL', flag: '🇧🇷', label: 'BRL (Brésil)' },
                                 { code: 'MXN', flag: '🇲🇽', label: 'MXN (Mexique)' },
-                                { code: 'COP', flag: '🇨🇴', label: 'COP (Colombie)' },
                                 { code: 'ARS', flag: '🇦🇷', label: 'ARS (Argentine)' },
+                                { code: 'COP', flag: '🇨🇴', label: 'COP (Colombie)' },
+                                { code: 'CLP', flag: '🇨🇱', label: 'CLP (Chili)' },
+                                { code: 'PEN', flag: '🇵🇪', label: 'PEN (Pérou)' },
+                                { code: 'UYU', flag: '🇺🇾', label: 'UYU (Uruguay)' },
+                                { code: 'CRC', flag: '🇨🇷', label: 'CRC (Costa Rica)' },
+                                { code: 'PAB', flag: '🇵🇦', label: 'PAB (Panama)' },
+                                { code: 'DOP', flag: '🇩🇴', label: 'DOP (Rép. Dominicaine)' },
+                                { code: 'USD', flag: '🇪🇨', label: 'USD (Équateur)' },
                               ].map((item) => (
                                 <button
-                                  key={item.code}
+                                  key={`${item.code}-${item.flag}`}
                                   type="button"
                                   onClick={() => setTargetCurrOverride(item.code)}
                                   className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition flex items-center space-x-1.5 ${
@@ -818,6 +847,7 @@ export default function WireTransferModal() {
                                       ? 'bg-blue-600 border-blue-500 text-white shadow-sm'
                                       : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                                   }`}
+                                  title={`${item.code} (${LATAM_COUNTRIES[item.code]?.[language] || item.code})`}
                                 >
                                   <span>{item.flag}</span>
                                   <span>{item.code}</span>
@@ -830,10 +860,10 @@ export default function WireTransferModal() {
                               <label className="block text-xs font-bold text-slate-700 mb-1">{transferCopy.accountOrClabe} *</label>
                               <input
                                 type="text"
-                                placeholder="13870001000100 / CLABE"
+                                placeholder={transferCopy.accountOrClabePlaceholder}
                                 value={accountNumber}
                                 onChange={(e) => {
-                                  setAccountNumber(e.target.value.replace(/\D/g, ''));
+                                  setAccountNumber(e.target.value.replace(/[^a-zA-Z0-9-\s]/g, '').toUpperCase());
                                   clearError('accountNumber');
                                 }}
                                 className={`w-full px-3 py-2 rounded-xl border bg-white text-slate-900 font-mono text-xs focus:ring-2 outline-none transition-colors ${
@@ -850,7 +880,7 @@ export default function WireTransferModal() {
                               <label className="block text-xs font-bold text-slate-700 mb-1">{transferCopy.recipientInstitution} *</label>
                               <input
                                 type="text"
-                                placeholder="Banco do Brasil, Banamex"
+                                placeholder="Banco do Brasil, Banamex, Banco de Chile..."
                                 value={iban}
                                 onChange={(e) => {
                                   setIban(e.target.value);
